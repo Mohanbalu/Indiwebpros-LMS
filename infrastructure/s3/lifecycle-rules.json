@@ -1,0 +1,113 @@
+{
+  "_comment": "IndiWebPros LMS — S3 Lifecycle Rules Configuration",
+  "_apply_via": "AWS CLI: aws s3api put-bucket-lifecycle-configuration --bucket indiwebpros-lms-bucket --lifecycle-configuration file://lifecycle-rules.json",
+  "Rules": [
+    {
+      "ID": "delete-temp-files-7-days",
+      "Filter": {
+        "Prefix": "temp/"
+      },
+      "Status": "Enabled",
+      "Expiration": {
+        "Days": 7
+      },
+      "AbortIncompleteMultipartUpload": {
+        "DaysAfterInitiation": 2
+      }
+    },
+    {
+      "ID": "delete-assignment-drafts-30-days",
+      "Filter": {
+        "Prefix": "drafts/"
+      },
+      "Status": "Enabled",
+      "Expiration": {
+        "Days": 30
+      },
+      "AbortIncompleteMultipartUpload": {
+        "DaysAfterInitiation": 7
+      }
+    },
+    {
+      "ID": "archive-logs-90-days-to-glacier",
+      "Filter": {
+        "Prefix": "logs/"
+      },
+      "Status": "Enabled",
+      "Transitions": [
+        {
+          "Days": 90,
+          "StorageClass": "GLACIER_IR"
+        },
+        {
+          "Days": 365,
+          "StorageClass": "DEEP_ARCHIVE"
+        }
+      ]
+    },
+    {
+      "ID": "abort-incomplete-multipart-uploads-7-days",
+      "Filter": {
+        "Prefix": ""
+      },
+      "Status": "Enabled",
+      "AbortIncompleteMultipartUpload": {
+        "DaysAfterInitiation": 7
+      }
+    },
+    {
+      "ID": "intelligent-tiering-assets",
+      "Filter": {
+        "Prefix": "assets/"
+      },
+      "Status": "Enabled",
+      "Transitions": [
+        {
+          "Days": 30,
+          "StorageClass": "INTELLIGENT_TIERING"
+        }
+      ]
+    },
+    {
+      "ID": "intelligent-tiering-thumbnails",
+      "Filter": {
+        "Prefix": "thumbnails/"
+      },
+      "Status": "Enabled",
+      "Transitions": [
+        {
+          "Days": 30,
+          "StorageClass": "INTELLIGENT_TIERING"
+        }
+      ]
+    },
+    {
+      "ID": "keep-lesson-videos-permanently",
+      "_comment": "Videos under lessons/ are retained indefinitely. No expiration. Move to cheaper storage after 180 days.",
+      "Filter": {
+        "Prefix": "lessons/"
+      },
+      "Status": "Enabled",
+      "Transitions": [
+        {
+          "Days": 180,
+          "StorageClass": "STANDARD_IA"
+        }
+      ]
+    },
+    {
+      "ID": "keep-certificates-forever",
+      "_comment": "Certificates are never deleted. Transition to IA after 1 year.",
+      "Filter": {
+        "Prefix": "certificates/"
+      },
+      "Status": "Enabled",
+      "Transitions": [
+        {
+          "Days": 365,
+          "StorageClass": "STANDARD_IA"
+        }
+      ]
+    }
+  ]
+}

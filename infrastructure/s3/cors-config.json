@@ -1,0 +1,37 @@
+{
+  "_comment": "S3 CORS configuration for CloudFront + direct multipart uploads from the browser",
+  "_apply_via": "AWS CLI: aws s3api put-bucket-cors --bucket indiwebpros-lms-bucket --cors-configuration file://cors-config.json",
+  "CORSRules": [
+    {
+      "ID": "allow-frontend-uploads",
+      "AllowedOrigins": [
+        "https://learn.indiwebpros.in",
+        "https://www.indiwebpros.in",
+        "http://localhost:5173",
+        "http://localhost:3000"
+      ],
+      "AllowedMethods": [
+        "GET",
+        "PUT",
+        "POST",
+        "HEAD"
+      ],
+      "AllowedHeaders": [
+        "Content-Type",
+        "Content-Length",
+        "Content-MD5",
+        "Authorization",
+        "x-amz-date",
+        "x-amz-content-sha256",
+        "x-amz-security-token"
+      ],
+      "ExposeHeaders": [
+        "ETag",
+        "x-amz-server-side-encryption",
+        "x-amz-request-id",
+        "x-amz-id-2"
+      ],
+      "MaxAgeSeconds": 3600
+    }
+  ]
+}

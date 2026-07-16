@@ -1,0 +1,13 @@
+{
+  "_comment": "EC2 Trust Policy — allows EC2 instances to assume the application role",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "ec2.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}

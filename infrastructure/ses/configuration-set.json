@@ -1,0 +1,48 @@
+{
+  "_comment": "SES Configuration Set — IndiWebPros LMS",
+  "_apply_via": "aws ses create-configuration-set --configuration-set Name=indiwebpros-lms",
+  "ConfigurationSet": {
+    "Name": "indiwebpros-lms"
+  },
+  "EventDestinations": [
+    {
+      "Name": "cloudwatch-metrics",
+      "Enabled": true,
+      "MatchingEventTypes": [
+        "send",
+        "reject",
+        "bounce",
+        "complaint",
+        "delivery",
+        "open",
+        "click",
+        "renderingFailure"
+      ],
+      "CloudWatchDestination": {
+        "DimensionConfigurations": [
+          {
+            "DimensionName": "MessageTag",
+            "DimensionValueSource": "messageTag",
+            "DefaultDimensionValue": "lms-email"
+          },
+          {
+            "DimensionName": "EmailType",
+            "DimensionValueSource": "emailHeader",
+            "DefaultDimensionValue": "transactional"
+          }
+        ]
+      }
+    },
+    {
+      "Name": "sns-bounce-complaint",
+      "Enabled": true,
+      "MatchingEventTypes": [
+        "bounce",
+        "complaint"
+      ],
+      "SNSDestination": {
+        "TopicARN": "arn:aws:sns:us-east-1:YOUR_ACCOUNT_ID:indiwebpros-lms-email-alerts"
+      }
+    }
+  ]
+}

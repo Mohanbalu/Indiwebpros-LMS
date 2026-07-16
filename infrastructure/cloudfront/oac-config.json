@@ -1,0 +1,11 @@
+{
+  "_comment": "CloudFront Origin Access Control (OAC) Configuration",
+  "_note": "OAC replaces legacy Origin Access Identity (OAI). More secure.",
+  "_apply_via": "aws cloudfront create-origin-access-control --origin-access-control-config file://oac-config.json",
+
+  "Name": "indiwebpros-lms-oac",
+  "Description": "Origin Access Control for IndiWebPros LMS S3 bucket",
+  "SigningProtocol": "sigv4",
+  "SigningBehavior": "always",
+  "OriginAccessControlOriginType": "s3"
+}

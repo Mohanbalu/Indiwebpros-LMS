@@ -1,0 +1,98 @@
+{
+  "_comment": "RDS PostgreSQL Parameter Group — IndiWebPros LMS",
+  "_apply_via": "See setup.sh for AWS CLI commands",
+  "DBParameterGroupFamily": "postgres16",
+  "Description": "Optimized parameter group for IndiWebPros LMS PostgreSQL",
+  "Parameters": [
+    {
+      "ParameterName": "log_min_duration_statement",
+      "ParameterValue": "1000",
+      "_comment": "Log queries taking longer than 1 second (slow query log)"
+    },
+    {
+      "ParameterName": "log_connections",
+      "ParameterValue": "1",
+      "_comment": "Log each new connection for security auditing"
+    },
+    {
+      "ParameterName": "log_disconnections",
+      "ParameterValue": "1",
+      "_comment": "Log connection terminations"
+    },
+    {
+      "ParameterName": "log_lock_waits",
+      "ParameterValue": "1",
+      "_comment": "Log lock wait events"
+    },
+    {
+      "ParameterName": "log_statement",
+      "ParameterValue": "ddl",
+      "_comment": "Log DDL statements (CREATE, ALTER, DROP) for audit"
+    },
+    {
+      "ParameterName": "log_line_prefix",
+      "ParameterValue": "%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h ",
+      "_comment": "Structured log prefix for CloudWatch parsing"
+    },
+    {
+      "ParameterName": "shared_preload_libraries",
+      "ParameterValue": "pg_stat_statements",
+      "_comment": "Enable pg_stat_statements for query performance analysis"
+    },
+    {
+      "ParameterName": "pg_stat_statements.track",
+      "ParameterValue": "all",
+      "_comment": "Track all statements in pg_stat_statements"
+    },
+    {
+      "ParameterName": "max_connections",
+      "ParameterValue": "100",
+      "_comment": "Appropriate for t3.small/medium. Use PgBouncer for higher load."
+    },
+    {
+      "ParameterName": "work_mem",
+      "ParameterValue": "4096",
+      "_comment": "4MB per sort/hash operation. Adjust based on instance RAM."
+    },
+    {
+      "ParameterName": "maintenance_work_mem",
+      "ParameterValue": "65536",
+      "_comment": "64MB for VACUUM, CREATE INDEX, etc."
+    },
+    {
+      "ParameterName": "effective_cache_size",
+      "ParameterValue": "524288",
+      "_comment": "512MB - hint to query planner about available OS cache"
+    },
+    {
+      "ParameterName": "random_page_cost",
+      "ParameterValue": "1.1",
+      "_comment": "Lower for SSD storage (RDS uses SSD by default)"
+    },
+    {
+      "ParameterName": "checkpoint_completion_target",
+      "ParameterValue": "0.9",
+      "_comment": "Spread checkpoint I/O over 90% of checkpoint interval"
+    },
+    {
+      "ParameterName": "wal_buffers",
+      "ParameterValue": "2048",
+      "_comment": "16MB WAL buffer size"
+    },
+    {
+      "ParameterName": "idle_in_transaction_session_timeout",
+      "ParameterValue": "30000",
+      "_comment": "Kill sessions idle in transaction for >30 seconds"
+    },
+    {
+      "ParameterName": "statement_timeout",
+      "ParameterValue": "30000",
+      "_comment": "Kill statements running longer than 30 seconds"
+    },
+    {
+      "ParameterName": "lock_timeout",
+      "ParameterValue": "5000",
+      "_comment": "Fail lock acquisition after 5 seconds to prevent deadlocks"
+    }
+  ]
+}

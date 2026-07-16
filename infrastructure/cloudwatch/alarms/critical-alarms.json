@@ -1,0 +1,118 @@
+{
+  "_comment": "CloudWatch Alarms — IndiWebPros LMS Critical Alerts",
+  "_apply_via": "Run setup.sh to create all alarms via AWS CLI",
+  "Alarms": [
+    {
+      "AlarmName": "lms-rds-cpu-high",
+      "AlarmDescription": "RDS CPU utilization exceeded 80%",
+      "MetricName": "CPUUtilization",
+      "Namespace": "AWS/RDS",
+      "Dimensions": [{ "Name": "DBInstanceIdentifier", "Value": "indiwebpros-lms-db" }],
+      "Statistic": "Average",
+      "Period": 300,
+      "EvaluationPeriods": 2,
+      "Threshold": 80,
+      "ComparisonOperator": "GreaterThanThreshold",
+      "TreatMissingData": "notBreaching",
+      "ActionsEnabled": true,
+      "AlarmActions": ["arn:aws:sns:us-east-1:YOUR_ACCOUNT_ID:indiwebpros-lms-alerts"],
+      "OKActions": ["arn:aws:sns:us-east-1:YOUR_ACCOUNT_ID:indiwebpros-lms-alerts"]
+    },
+    {
+      "AlarmName": "lms-rds-connections-high",
+      "AlarmDescription": "RDS connections approaching limit (>90/100)",
+      "MetricName": "DatabaseConnections",
+      "Namespace": "AWS/RDS",
+      "Dimensions": [{ "Name": "DBInstanceIdentifier", "Value": "indiwebpros-lms-db" }],
+      "Statistic": "Average",
+      "Period": 60,
+      "EvaluationPeriods": 3,
+      "Threshold": 90,
+      "ComparisonOperator": "GreaterThanThreshold",
+      "TreatMissingData": "notBreaching",
+      "AlarmActions": ["arn:aws:sns:us-east-1:YOUR_ACCOUNT_ID:indiwebpros-lms-alerts"]
+    },
+    {
+      "AlarmName": "lms-rds-storage-low",
+      "AlarmDescription": "RDS free storage below 2GB",
+      "MetricName": "FreeStorageSpace",
+      "Namespace": "AWS/RDS",
+      "Dimensions": [{ "Name": "DBInstanceIdentifier", "Value": "indiwebpros-lms-db" }],
+      "Statistic": "Average",
+      "Period": 3600,
+      "EvaluationPeriods": 1,
+      "Threshold": 2147483648,
+      "ComparisonOperator": "LessThanThreshold",
+      "AlarmActions": ["arn:aws:sns:us-east-1:YOUR_ACCOUNT_ID:indiwebpros-lms-alerts"]
+    },
+    {
+      "AlarmName": "lms-api-server-errors",
+      "AlarmDescription": "API server error rate spike (>5 errors in 5 minutes)",
+      "MetricName": "ServerErrors",
+      "Namespace": "IndiWebPros/LMS",
+      "Statistic": "Sum",
+      "Period": 300,
+      "EvaluationPeriods": 1,
+      "Threshold": 5,
+      "ComparisonOperator": "GreaterThanThreshold",
+      "TreatMissingData": "notBreaching",
+      "AlarmActions": ["arn:aws:sns:us-east-1:YOUR_ACCOUNT_ID:indiwebpros-lms-alerts"]
+    },
+    {
+      "AlarmName": "lms-payment-failures",
+      "AlarmDescription": "Payment failure spike (>3 failures in 5 minutes)",
+      "MetricName": "PaymentFailures",
+      "Namespace": "IndiWebPros/LMS",
+      "Statistic": "Sum",
+      "Period": 300,
+      "EvaluationPeriods": 1,
+      "Threshold": 3,
+      "ComparisonOperator": "GreaterThanThreshold",
+      "TreatMissingData": "notBreaching",
+      "AlarmActions": ["arn:aws:sns:us-east-1:YOUR_ACCOUNT_ID:indiwebpros-lms-alerts"]
+    },
+    {
+      "AlarmName": "lms-auth-failures",
+      "AlarmDescription": "Auth failure spike (>20 failures in 5 minutes — possible brute force)",
+      "MetricName": "AuthFailures",
+      "Namespace": "IndiWebPros/LMS",
+      "Statistic": "Sum",
+      "Period": 300,
+      "EvaluationPeriods": 1,
+      "Threshold": 20,
+      "ComparisonOperator": "GreaterThanThreshold",
+      "TreatMissingData": "notBreaching",
+      "AlarmActions": ["arn:aws:sns:us-east-1:YOUR_ACCOUNT_ID:indiwebpros-lms-alerts"]
+    },
+    {
+      "AlarmName": "lms-ses-bounce-rate",
+      "AlarmDescription": "SES bounce rate exceeded 5% (AWS will pause sending at 10%)",
+      "MetricName": "Bounce",
+      "Namespace": "AWS/SES",
+      "Statistic": "Sum",
+      "Period": 3600,
+      "EvaluationPeriods": 1,
+      "Threshold": 50,
+      "ComparisonOperator": "GreaterThanThreshold",
+      "TreatMissingData": "notBreaching",
+      "AlarmActions": ["arn:aws:sns:us-east-1:YOUR_ACCOUNT_ID:indiwebpros-lms-alerts"]
+    },
+    {
+      "AlarmName": "lms-cloudfront-5xx",
+      "AlarmDescription": "CloudFront 5xx error rate exceeded 1%",
+      "MetricName": "5xxErrorRate",
+      "Namespace": "AWS/CloudFront",
+      "Dimensions": [
+        { "Name": "DistributionId", "Value": "YOUR_DISTRIBUTION_ID" },
+        { "Name": "Region", "Value": "Global" }
+      ],
+      "Statistic": "Average",
+      "Period": 300,
+      "EvaluationPeriods": 2,
+      "Threshold": 1,
+      "ComparisonOperator": "GreaterThanThreshold",
+      "TreatMissingData": "notBreaching",
+      "AlarmActions": ["arn:aws:sns:us-east-1:YOUR_ACCOUNT_ID:indiwebpros-lms-alerts"]
+    }
+  ]
+}

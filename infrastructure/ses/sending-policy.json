@@ -1,0 +1,42 @@
+{
+  "_comment": "SES Sending Authorization Policy — IndiWebPros LMS",
+  "_note": "This policy allows the LMS application to send email using the verified identity",
+  "_apply_via": "aws ses put-identity-policy --identity indiwebpros.in --policy-name lms-sending-policy --policy file://sending-policy.json",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowLMSAppToSendEmail",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::YOUR_ACCOUNT_ID:role/indiwebpros-lms-app-role"
+      },
+      "Action": [
+        "ses:SendEmail",
+        "ses:SendRawEmail",
+        "ses:SendTemplatedEmail"
+      ],
+      "Resource": "arn:aws:ses:us-east-1:YOUR_ACCOUNT_ID:identity/indiwebpros.in",
+      "Condition": {
+        "StringEquals": {
+          "ses:FromAddress": [
+            "noreply@indiwebpros.in",
+            "support@indiwebpros.in",
+            "certificates@indiwebpros.in"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "DenyFromUnauthorizedAddresses",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "ses:SendEmail",
+      "Resource": "arn:aws:ses:us-east-1:YOUR_ACCOUNT_ID:identity/indiwebpros.in",
+      "Condition": {
+        "StringNotLike": {
+          "ses:FromAddress": "*@indiwebpros.in"
+        }
+      }
+    }
+  ]
+}

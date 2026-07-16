@@ -1,0 +1,21 @@
+{
+  "_comment": "S3 Read-Only policy for CloudFront OAC (attached to CloudFront service principal via bucket policy — not IAM)",
+  "_note": "CloudFront OAC uses bucket policy, not IAM policy. This document is reference only.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CloudFrontReadOnly",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "cloudfront.amazonaws.com"
+      },
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::indiwebpros-lms-bucket/*",
+      "Condition": {
+        "StringEquals": {
+          "AWS:SourceArn": "arn:aws:cloudfront::YOUR_ACCOUNT_ID:distribution/YOUR_DISTRIBUTION_ID"
+        }
+      }
+    }
+  ]
+}

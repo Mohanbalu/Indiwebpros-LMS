@@ -1,0 +1,130 @@
+name: Enterprise CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Build & Deploy Application
+    runs-on: ubuntu-latest
+
+    # Select environment dynamically based on target branch
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm Package Manager
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10
+
+      - name: Setup Node.js Runtime environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install Project Dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Generate Prisma Clients
+        run: pnpm --filter backend prisma:generate
+
+      - name: Configure AWS Credentials via IAM OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Log in to Amazon ECR Registry
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set Image Tag and Registry variables
+        run: |
+          echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
+          echo "ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}" >> $GITHUB_ENV
+
+      - name: Build & Tag Docker Images
+        run: |
+          docker build -t $ECR_REGISTRY/lms-backend:$IMAGE_TAG -t $ECR_REGISTRY/lms-backend:latest -f docker/Dockerfile.backend .
+          docker build -t $ECR_REGISTRY/lms-frontend:$IMAGE_TAG -t $ECR_REGISTRY/lms-frontend:latest -f docker/Dockerfile.frontend .
+
+      - name: Push Docker Images to ECR
+        run: |
+          docker push $ECR_REGISTRY/lms-backend:$IMAGE_TAG
+          docker push $ECR_REGISTRY/lms-backend:latest
+          docker push $ECR_REGISTRY/lms-frontend:$IMAGE_TAG
+          docker push $ECR_REGISTRY/lms-frontend:latest
+
+      - name: Execute Prisma Production Migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm --filter backend prisma migrate deploy
+
+      - name: Deploy and Verify Server State on AWS EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.AWS_EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.AWS_SSH_PRIVATE_KEY }}
+          port: 22
+          envs: ECR_REGISTRY,IMAGE_TAG,DATABASE_URL
+          script: |
+            # Create deployment directories
+            mkdir -p ~/lms/deployments ~/lms/docker
+
+            # Write production environment file
+            cat <<EOF > ~/lms/.env
+            NODE_ENV=production
+            DATABASE_URL=$DATABASE_URL
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
+            AWS_REGION=${{ secrets.AWS_REGION }}
+            S3_BUCKET=${{ secrets.S3_BUCKET }}
+            SES_REGION=${{ secrets.SES_REGION }}
+            RAZORPAY_KEY_ID=${{ secrets.RAZORPAY_KEY_ID }}
+            RAZORPAY_KEY_SECRET=${{ secrets.RAZORPAY_KEY_SECRET }}
+            SMTP_HOST=${{ secrets.SMTP_HOST }}
+            SMTP_PORT=${{ secrets.SMTP_PORT }}
+            SMTP_USER=${{ secrets.SMTP_USER }}
+            SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}
+            ECR_REGISTRY=$ECR_REGISTRY
+            IMAGE_TAG=$IMAGE_TAG
+            EOF
+
+      - name: Copy Compose & Scripts to Target Host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.AWS_EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.AWS_SSH_PRIVATE_KEY }}
+          port: 22
+          source: "docker/docker-compose.prod.yml,docker/nginx.conf,deployments/*.sh"
+          target: "~/lms"
+          strip_components: 0
+
+      - name: Execute Swaps, Migrations & Validation on Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.AWS_EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.AWS_SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            cd ~/lms
+
+            # Make deployment scripts executable
+            chmod +x deployments/*.sh
+
+            # Run deployment script
+            ./deployments/deploy.sh

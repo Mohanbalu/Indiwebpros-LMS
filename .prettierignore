@@ -1,0 +1,11 @@
+# Ignore generated Prisma Client code in Prettier
+backend/src/generated/
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+backend/src/
+frontend/src/
+infrastructure/
+docs/

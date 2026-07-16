@@ -1,0 +1,115 @@
+{
+  "_comment": "Security Group Rules — IndiWebPros LMS Network Architecture",
+  "_note": "These are reference configurations. Apply via setup.sh or AWS Console.",
+
+  "SecurityGroups": [
+    {
+      "GroupName": "lms-alb-sg",
+      "Description": "Application Load Balancer — allows public HTTPS/HTTP traffic",
+      "InboundRules": [
+        {
+          "IpProtocol": "tcp",
+          "FromPort": 443,
+          "ToPort": 443,
+          "CidrIpv4": "0.0.0.0/0",
+          "Description": "HTTPS from internet"
+        },
+        {
+          "IpProtocol": "tcp",
+          "FromPort": 80,
+          "ToPort": 80,
+          "CidrIpv4": "0.0.0.0/0",
+          "Description": "HTTP from internet (redirects to HTTPS via ALB listener)"
+        }
+      ],
+      "OutboundRules": [
+        {
+          "IpProtocol": "-1",
+          "CidrIpv4": "0.0.0.0/0",
+          "Description": "Allow all outbound to EC2"
+        }
+      ]
+    },
+    {
+      "GroupName": "lms-ec2-sg",
+      "Description": "EC2 Application Server — only receives traffic from ALB",
+      "InboundRules": [
+        {
+          "IpProtocol": "tcp",
+          "FromPort": 5000,
+          "ToPort": 5000,
+          "SourceGroupId": "lms-alb-sg",
+          "Description": "Node.js API from ALB only"
+        },
+        {
+          "IpProtocol": "tcp",
+          "FromPort": 22,
+          "ToPort": 22,
+          "CidrIpv4": "YOUR_OFFICE_IP/32",
+          "Description": "SSH from trusted IP only — change to your static IP"
+        }
+      ],
+      "OutboundRules": [
+        {
+          "IpProtocol": "tcp",
+          "FromPort": 5432,
+          "ToPort": 5432,
+          "DestinationGroupId": "lms-rds-sg",
+          "Description": "Database connection to RDS"
+        },
+        {
+          "IpProtocol": "tcp",
+          "FromPort": 443,
+          "ToPort": 443,
+          "CidrIpv4": "0.0.0.0/0",
+          "Description": "HTTPS to AWS APIs (S3, SES, Secrets Manager, CloudWatch)"
+        },
+        {
+          "IpProtocol": "tcp",
+          "FromPort": 587,
+          "ToPort": 587,
+          "CidrIpv4": "0.0.0.0/0",
+          "Description": "SMTP TLS for email (fallback)"
+        }
+      ]
+    },
+    {
+      "GroupName": "lms-rds-sg",
+      "Description": "RDS PostgreSQL — only EC2 can connect. No public access.",
+      "InboundRules": [
+        {
+          "IpProtocol": "tcp",
+          "FromPort": 5432,
+          "ToPort": 5432,
+          "SourceGroupId": "lms-ec2-sg",
+          "Description": "PostgreSQL from EC2 app server only"
+        },
+        {
+          "IpProtocol": "tcp",
+          "FromPort": 5432,
+          "ToPort": 5432,
+          "CidrIpv4": "YOUR_OFFICE_IP/32",
+          "Description": "Dev access from trusted IP — REMOVE IN STRICT PRODUCTION"
+        }
+      ],
+      "OutboundRules": []
+    }
+  ],
+
+  "NetworkTopology": {
+    "VPC": "10.0.0.0/16",
+    "PublicSubnets": [
+      { "Name": "lms-public-1a", "CIDR": "10.0.1.0/24", "AZ": "us-east-1a", "Purpose": "ALB" },
+      { "Name": "lms-public-1b", "CIDR": "10.0.2.0/24", "AZ": "us-east-1b", "Purpose": "ALB" }
+    ],
+    "PrivateSubnets": [
+      { "Name": "lms-private-1a", "CIDR": "10.0.10.0/24", "AZ": "us-east-1a", "Purpose": "EC2, RDS" },
+      { "Name": "lms-private-1b", "CIDR": "10.0.11.0/24", "AZ": "us-east-1b", "Purpose": "RDS replica" }
+    ],
+    "NATGateway": {
+      "Subnet": "lms-public-1a",
+      "Purpose": "EC2 outbound internet access (AWS APIs, npm, etc.)"
+    },
+    "InternetGateway": "Attached to VPC for public subnets"
+  }
+}

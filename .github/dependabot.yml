@@ -1,0 +1,27 @@
+version: 2
+updates:
+  # Maintain dependency updates for pnpm monorepo package configuration files
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    groups:
+      monorepo-dependencies:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "security"
+
+  # Maintain updates for GitHub Actions workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "github-actions"
+      - "dependencies"

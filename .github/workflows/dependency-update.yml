@@ -1,0 +1,33 @@
+name: Automated Dependency Check
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Runs every Monday at 06:00 AM UTC
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  check-updates:
+    name: Check Outdated Packages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm Package Manager
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10
+
+      - name: Setup Node.js Runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install Project Dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Report Outdated Workspace Packages
+        run: |
+          pnpm outdated || true
