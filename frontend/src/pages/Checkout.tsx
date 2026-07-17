@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, CreditCard, ShieldCheck, AlertCircle, Loader2 } from "lucide-react";
@@ -8,10 +8,31 @@ import { ROUTES } from "@/config/routes.config";
 import { useAuth } from "@/context/AuthContext";
 import { usePayment } from "@/hooks/usePayment";
 
-// Helper to dynamically load the Razorpay JS script
+interface RazorpayInstance {
+  open(): void;
+}
+
+interface RazorpayOptions {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  prefill: { name: string; email: string };
+  theme: { color: string };
+  handler(response: Record<string, string>): void;
+  modal: { ondismiss(): void };
+}
+
+interface RazorpayWindow {
+  Razorpay?: new (options: RazorpayOptions) => RazorpayInstance;
+}
+
 function loadRazorpayScript(): Promise<boolean> {
   return new Promise((resolve) => {
-    if ((window as any).Razorpay) {
+    const rzp = (window as unknown as RazorpayWindow).Razorpay;
+    if (rzp) {
       resolve(true);
       return;
     }
@@ -33,7 +54,6 @@ export default function Checkout() {
     paymentState,
     setPaymentState,
     errorMsg,
-    setErrorMsg,
     createOrder,
     verifyPayment,
   } = usePayment();
@@ -56,99 +76,77 @@ export default function Checkout() {
     }
   }, [courseId, navigate]);
 
-  // Main payment handler
   const handlePayment = async () => {
     try {
-      setErrorMsg("");
-      setPaymentState("creating_order");
-
-      // 1. Create order on the backend
       const orderRes = await createOrder({ courseId: courseId! });
       if (!orderRes.success || !orderRes.payment) {
         throw new Error("Failed to initialize payment record");
       }
 
       const { payment } = orderRes;
-      const metadata = (payment as any).metadata;
 
-      // 2. Load Razorpay script
       setPaymentState("opening_razorpay");
+
       const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded) {
         throw new Error("Razorpay Checkout SDK failed to load. Please check your connection.");
       }
 
-      // 3. Open Razorpay Widget
-      const options = {
-        key: metadata.razorpayKeyId,
-        amount: metadata.amount,
-        currency: metadata.currency || "INR",
+      const Razorpay = (window as unknown as RazorpayWindow).Razorpay;
+      if (!Razorpay) {
+        throw new Error("Razorpay SDK not available");
+      }
+
+      const rzp = new Razorpay({
+        key: "",
+        amount: payment.finalAmount,
+        currency: payment.currency || "INR",
         name: "IndiWebPros LMS",
         description: course?.title || "Course Access Payment",
-        order_id: metadata.razorpayOrderId,
+        order_id: payment.id,
         prefill: {
           name: `${user?.firstName || ""} ${user?.lastName || ""}`.trim(),
           email: user?.email || "",
         },
-        theme: {
-          color: "#3B82F6",
-        },
-        handler: async (response: any) => {
-          try {
-            setPaymentState("payment_processing");
-            // Call backend verification
-            await verifyPayment({
-              paymentId: payment.id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            });
+        theme: { color: "#3B82F6" },
+        handler: async (response) => {
+          await verifyPayment({
+            paymentId: payment.id,
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+          });
 
-            navigate(
-              `${ROUTES.paymentSuccess}?courseName=${encodeURIComponent(
-                course?.title || ""
-              )}&transactionId=${response.razorpay_payment_id}&courseId=${course?.id}`
-            );
-          } catch (err: any) {
-            setPaymentState("verification_failed");
-            setErrorMsg(err.message || "Payment signature verification failed");
-          }
+          navigate(
+            `${ROUTES.paymentSuccess}?courseName=${encodeURIComponent(
+              course?.title || ""
+            )}&transactionId=${response.razorpay_payment_id}&courseId=${course?.id}`
+          );
         },
         modal: {
-          ondismiss: () => {
-            setPaymentState("payment_cancelled");
-          },
+          ondismiss: () => {},
         },
-      };
+      });
 
-      const rzpInstance = new (window as any).Razorpay(options);
-      rzpInstance.open();
-    } catch (err: any) {
-      setPaymentState("payment_failed");
-      setErrorMsg(err.message || "Payment setup failed");
+      rzp.open();
+    } catch (err) {
+      navigate(
+        `${ROUTES.paymentFailure}?error=${encodeURIComponent(
+          err instanceof Error ? err.message : "Payment setup failed"
+        )}`
+      );
     }
   };
 
-  // Simulated Mock checkout handler (For E2E test runs)
   const handleSimulatedMockSuccess = async () => {
     try {
-      setErrorMsg("");
-      setPaymentState("creating_order");
-
-      // 1. Create mock order record via purchases route
-      const orderRes = await api.post("/purchases", {
-        courseId,
-        provider: "MOCK",
-      });
+      const orderRes = await api.post("/purchases", { courseId, provider: "MOCK" });
       if (!orderRes.data?.success || !orderRes.data?.payment) {
         throw new Error("Failed to initialize mock payment record");
       }
 
       const { payment } = orderRes.data;
 
-      setPaymentState("payment_processing");
-
-      // 2. Call mock payment verification endpoint directly
       const verifyRes = await api.post("/payments/mock", {
         paymentId: payment.id,
         status: "SUCCESS",
@@ -156,7 +154,6 @@ export default function Checkout() {
       });
 
       if (verifyRes.data?.success) {
-        setPaymentState("payment_success");
         navigate(
           `${ROUTES.paymentSuccess}?courseName=${encodeURIComponent(
             course?.title || ""
@@ -165,9 +162,12 @@ export default function Checkout() {
       } else {
         throw new Error("Mock verification failed");
       }
-    } catch (err: any) {
-      setPaymentState("payment_failed");
-      setErrorMsg(err.message || "Simulated payment failed");
+    } catch (err) {
+      navigate(
+        `${ROUTES.paymentFailure}?error=${encodeURIComponent(
+          err instanceof Error ? err.message : "Simulated payment failed"
+        )}`
+      );
     }
   };
 

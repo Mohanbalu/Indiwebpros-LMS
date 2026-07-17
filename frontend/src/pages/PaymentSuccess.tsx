@@ -1,5 +1,5 @@
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
-import { CheckCircle2, ArrowRight, ArrowLeft } from "lucide-react";
+import { CheckCircle2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ROUTES } from "@/config/routes.config";
 

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { certificateService } from "../services/certificate.service";
 import { prisma } from "@/database/client";
 import { ValidationError, ForbiddenError, NotFoundError } from "@/errors/custom-errors";
+import { ServiceContainer } from "@/services/shared/service-container";
 import {
   generateCertificateSchema,
   revokeCertificateSchema,
@@ -57,7 +58,44 @@ export class CertificateController {
         }
       }
 
-      res.json({ success: true, data: cert });
+      // Fetch the instructor details to supply the expected name property
+      const instructor = await prisma.user.findUnique({
+        where: { id: cert.course.instructorId },
+        select: { firstName: true, lastName: true },
+      });
+
+      const instructorName = instructor ? `${instructor.firstName} ${instructor.lastName}`.trim() : "Authorized Instructor";
+
+      // Dynamically sign private S3 URLs for previewing and rendering in the browser
+      let signedPdfUrl = null;
+      if (cert.pdfFile) {
+        signedPdfUrl = await ServiceContainer.storage.getSignedDownloadUrl(cert.pdfFile.key);
+      }
+
+      let signedQrUrl = null;
+      if (cert.qrCodeFile) {
+        signedQrUrl = await ServiceContainer.storage.getSignedDownloadUrl(cert.qrCodeFile.key);
+      }
+
+      const mappedCert = {
+        ...cert,
+        course: {
+          ...cert.course,
+          instructor: {
+            name: instructorName,
+          },
+        },
+        pdfFile: cert.pdfFile ? {
+          ...cert.pdfFile,
+          url: signedPdfUrl,
+        } : null,
+        qrCodeFile: cert.qrCodeFile ? {
+          ...cert.qrCodeFile,
+          url: signedQrUrl,
+        } : null,
+      };
+
+      res.json({ success: true, data: mappedCert });
     } catch (e) { next(e); }
   }
 
@@ -68,6 +106,18 @@ export class CertificateController {
 
       const issuerId = req.user!.userId;
       const cert = await certificateService.generateCertificate(parsed.data.userId, parsed.data.courseId, issuerId);
+
+      res.status(201).json({ success: true, data: cert });
+    } catch (e) { next(e); }
+  }
+
+  static async generateStudentCertificate(req: Request, res: Response, next: NextFunction) {
+    try {
+      const courseId = req.body.courseId as string;
+      if (!courseId) throw new ValidationError("Course ID is required");
+
+      const userId = req.user!.userId;
+      const cert = await certificateService.generateCertificate(userId, courseId);
 
       res.status(201).json({ success: true, data: cert });
     } catch (e) { next(e); }

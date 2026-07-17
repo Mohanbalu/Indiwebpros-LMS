@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Clock, Users, Star, CheckCircle, ArrowLeft, ArrowRight, ShieldCheck, Check, Info, Lock, Play } from "lucide-react";
+import { Clock, Users, Star, CheckCircle, ArrowLeft, ShieldCheck, Check, Lock, Play } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/services/api";
 import { ROUTES } from "@/config/routes.config";
@@ -49,7 +49,7 @@ export default function CourseDetail() {
   });
 
   // Fetching course details via React Query
-  const { data: courseRes, isLoading, error } = useQuery({
+  const { data: courseRes, isLoading } = useQuery({
     queryKey: ["courseDetail", slug],
     queryFn: async () => {
       const res = await api.get(`/courses/slug/${slug}`);
@@ -57,56 +57,13 @@ export default function CourseDetail() {
     },
   });
 
-  const fallbackCourses: CourseDetailData[] = [
-    {
-      id: "course-1",
-      title: "Advanced Full Stack TypeScript SaaS Architecture",
-      slug: "full-stack-typescript-saas-architecture",
-      description: "Build, secure, and deploy complete Next.js apps with Postgres, Prisma ORM, BullMQ queues, and Docker.",
-      level: "Advanced",
-      price: 199,
-      duration: "12 Weeks",
-      rating: 4.9,
-      studentsCount: 1240,
-      category: { name: "Full Stack Development" },
-      instructor: { firstName: "Mohan", lastName: "Balu", bio: "Ex-Google Staff Engineer with 15+ years experience in systems design." },
-      requirements: [
-        "Solid foundations in JavaScript and modern ES6 syntax",
-        "Basic understanding of relational databases and SQL",
-        "Familiarity with Node.js and REST API endpoints",
-      ],
-      outcomes: [
-        "Design production-grade database structures using Prisma ORM",
-        "Implement secure role-based access control rules & JWT validations",
-        "Integrate asynchronous worker queues using Redis and BullMQ",
-        "Write autograded unit & integration tests on TypeScript code bases",
-      ],
-      modules: [
-        {
-          id: "m1",
-          title: "Module 1: Infrastructure and Database Schema Design",
-          lessons: [
-            { id: "l1", title: "Introduction to Enterprise Prisma & PostgreSQL setups", duration: 15, isPreview: true },
-            { id: "l2", title: "Setting up foreign key constraints and index models", duration: 25 },
-          ],
-        },
-        {
-          id: "m2",
-          title: "Module 2: Enterprise Authentication & Role Matrices",
-          lessons: [
-            { id: "l3", title: "JSON Web Token secure signing and refresh tokens", duration: 20, isPreview: true },
-            { id: "l4", title: "Validating resource routes permissions parameters", duration: 30 },
-          ],
-        },
-      ],
-    },
-  ];
-
   const course: CourseDetailData | null = courseRes?.success && courseRes.data
     ? courseRes.data
-    : fallbackCourses.find((c) => c.slug === slug) || null;
+    : null;
 
-  const isEnrolled = myCourses?.data?.some((e: any) => e.course?.id === course?.id) || false;
+  const isEnrolled = myCourses?.data?.some(
+    (e: { course?: { id?: string } }) => e.course?.id === course?.id
+  ) || false;
 
   if (isLoading) {
     return (
@@ -205,7 +162,9 @@ export default function CourseDetail() {
                     try {
                       await enrollFree({ courseId: course.id });
                       navigate(ROUTES.player);
-                    } catch {}
+                    } catch (error) {
+                      console.error("[CourseDetail] Free enrollment failed:", error);
+                    }
                   }}
                   className="w-full enroll-btn"
                   size="lg"

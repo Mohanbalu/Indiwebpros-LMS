@@ -91,6 +91,50 @@ pnpm dev:frontend
 pnpm dev:backend
 ```
 
+#### Email Provider Configuration
+
+The backend email layer supports provider switching only through configuration. Set `EMAIL_PROVIDER` to `brevo`, `ses`, or `smtp` and keep the existing templates unchanged.
+
+Brevo SMTP development configuration:
+
+```bash
+EMAIL_PROVIDER=brevo
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM_NAME=IndiWebPros LMS
+SMTP_FROM_EMAIL=noreply@indiwebpros.com
+SMTP_SECURE=false
+```
+
+AWS SES configuration:
+
+```bash
+EMAIL_PROVIDER=ses
+```
+
+Generic SMTP configuration:
+
+```bash
+EMAIL_PROVIDER=smtp
+```
+
+Credentials are always read from environment variables and never hardcoded in the application. Logs include provider, recipient, message type, success/failure, and retry attempts without exposing secrets.
+
+#### Email Health Checks
+
+On startup, the backend performs a non-sending email health check for the configured provider. The check verifies DNS resolution, TCP connectivity, SMTP TLS negotiation, and SMTP authentication through Nodemailer's verification flow. It does not send a message.
+
+Detailed email health is available at `GET /api/v1/health/email` for Admin users or internal callers that pass `x-internal-key` matching `INTERNAL_EMAIL_HEALTH_KEY` or `INTERNAL_METRICS_KEY`. The response includes provider, connection status, authentication status, last successful check, and a sanitized error message. SMTP usernames and passwords are never returned.
+
+Run the related backend checks with:
+
+```bash
+pnpm --dir backend test:email
+pnpm --dir backend test:observability
+```
+
 ---
 
 ## Folder Structure

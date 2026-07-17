@@ -11,4 +11,5 @@ export interface IStorageService {
   uploadPart(path: string, uploadId: string, partNumber: number, body: Buffer): Promise<{ ETag: string; PartNumber: number }>;
   completeMultipartUpload(path: string, uploadId: string, parts: Array<{ ETag: string; PartNumber: number }>): Promise<Record<string, unknown>>;
   abortMultipartUpload(path: string, uploadId: string): Promise<void>;
+  getStream(path: string, range?: string): Promise<{ stream: any; contentType?: string; contentLength?: number; contentRange?: string; acceptRanges?: string }>;
 }

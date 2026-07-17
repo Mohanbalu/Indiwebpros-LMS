@@ -158,7 +158,7 @@ export class StorageController {
       const userId = req.user?.userId || "";
       const isOwner = file.uploadedBy === userId;
 
-      if (role !== "Admin" && !isOwner) {
+      if (role !== "Admin" && role !== "Instructor" && !isOwner) {
         throw new SignedURLException("Access denied: You are not authorized to download this file resource");
       }
 

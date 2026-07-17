@@ -12,6 +12,7 @@ router.use(authGuard);
 
 router.get("/course/:courseId", readRl, CoursePlayerController.getCourseStructure);
 router.get("/lesson/:lessonId", readRl, CoursePlayerController.getLessonDetails);
+router.get("/video-stream/:lessonId", CoursePlayerController.streamVideo);
 router.post("/lesson/download/:resourceId", writeRl, CoursePlayerController.trackDownload);
 
 // Progress patches

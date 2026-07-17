@@ -13,24 +13,80 @@ export class DatabaseAuditProvider implements IAuditService, ILifecycleService, 
     ServiceContainer.logger.info("DatabaseAuditProvider initialized");
   }
 
+  private getEventTypeFromPayload(payload: Record<string, any>): string {
+    if (payload.eventType && typeof payload.eventType === "string") {
+      return payload.eventType;
+    }
+    
+    const action = String(payload.action || "").toUpperCase();
+    const entity = String(payload.entity || payload.resource || "").toUpperCase();
+
+    if (action.includes("LOGIN") || action.includes("LOGOUT") || action.includes("PASSWORD") || action.includes("VERIFY") || action.includes("SECURITY")) {
+      return "SECURITY";
+    }
+    
+    if (entity.includes("COURSE") || entity.includes("MODULE") || entity.includes("LESSON") || action.startsWith("COURSE_") || action.startsWith("MODULE_") || action.startsWith("LESSON_")) {
+      return "COURSE";
+    }
+
+    if (entity.includes("PAYMENT") || entity.includes("ENROLLMENT") || entity.includes("COUPON") || action.startsWith("ENROLLMENT_") || action.startsWith("PAYMENT_") || action.startsWith("COUPON_")) {
+      return "PAYMENT";
+    }
+
+    if (entity.includes("QUIZ") || entity.includes("ASSIGNMENT") || action.startsWith("QUIZ_") || action.startsWith("ASSIGNMENT_")) {
+      return "ASSESSMENT";
+    }
+
+    if (entity.includes("CERTIFICATE") || action.startsWith("CERTIFICATE_")) {
+      return "CERTIFICATE";
+    }
+
+    if (entity.includes("NOTIFICATION") || action.startsWith("NOTIFICATION_")) {
+      return "NOTIFICATION";
+    }
+
+    if (action.startsWith("ADMIN_") || action === "ADMIN") {
+      return "ADMIN";
+    }
+
+    return "GENERAL";
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async log(payload: Record<string, any>): Promise<void> {
     try {
+      const derivedEventType = this.getEventTypeFromPayload(payload);
+      const derivedAction = payload.action || "UNKNOWN";
+      const derivedEntity = payload.entity || payload.resource || "System";
+      const derivedEntityId = payload.entityId || payload.resourceId || null;
+      const derivedSuccess = payload.success !== undefined 
+        ? payload.success 
+        : (payload.status !== undefined ? payload.status === "SUCCESS" : true);
+      const derivedStatusCode = payload.statusCode || (derivedSuccess ? 200 : 400);
+      const derivedMetadata = payload.metadata || payload.details || null;
+
+      // Ensure userId is a valid UUID, otherwise default to null to prevent database driver constraint errors.
+      const isUuid = (val: string) => {
+        return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(val);
+      };
+      const cleanUserId = (payload.userId && typeof payload.userId === "string" && isUuid(payload.userId))
+        ? payload.userId
+        : null;
+
       await prisma.auditLog.create({
         data: {
-          userId: payload.userId || null,
-          eventType: payload.eventType,
-          action: payload.action,
-          entity: payload.entity,
-          entityId: payload.entityId || null,
+          userId: cleanUserId,
+          eventType: derivedEventType,
+          action: derivedAction,
+          entity: derivedEntity,
+          entityId: derivedEntityId,
           ipAddress: payload.ipAddress || null,
           userAgent: payload.userAgent || null,
           requestMethod: payload.requestMethod || "N/A",
           requestPath: payload.requestPath || "N/A",
-          statusCode: payload.statusCode || 200,
-          success: payload.success !== undefined ? payload.success : true,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          metadata: (payload.metadata as any) || null,
+          statusCode: derivedStatusCode,
+          success: derivedSuccess,
+          metadata: (derivedMetadata as any) || null,
         },
       });
       this.logsCount++;

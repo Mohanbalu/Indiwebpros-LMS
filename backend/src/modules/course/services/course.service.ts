@@ -69,7 +69,7 @@ export class CourseService {
       });
     } catch { /* non-blocking */ }
 
-    return course;
+    return this.signCourseMediaUrls(course);
   }
 
   async update(id: string, input: UpdateCourseInput, userId: string, userRole: string): Promise<Course> {
@@ -116,7 +116,7 @@ export class CourseService {
       });
     } catch { /* non-blocking */ }
 
-    return course;
+    return this.signCourseMediaUrls(course);
   }
 
   async publish(id: string, userId: string, userRole: string): Promise<Course> {
@@ -155,7 +155,7 @@ export class CourseService {
       } catch { /* non-blocking */ }
     } catch { /* non-blocking */ }
 
-    return course;
+    return this.signCourseMediaUrls(course);
   }
 
   async archive(id: string, userId: string, userRole: string): Promise<Course> {
@@ -182,7 +182,7 @@ export class CourseService {
       });
     } catch { /* non-blocking */ }
 
-    return course;
+    return this.signCourseMediaUrls(course);
   }
 
   async delete(id: string, userId: string, userRole: string): Promise<void> {
@@ -208,7 +208,12 @@ export class CourseService {
           include: {
             lessons: {
               where: { deletedAt: null },
-              include: { resources: true },
+              include: {
+                video: true,
+                resources: {
+                  include: { file: true }
+                }
+              },
             },
           },
           orderBy: { sortOrder: "asc" },
@@ -312,7 +317,8 @@ export class CourseService {
       }
 
       ServiceContainer.logger.info(`Course duplicated: ${source.id} → ${newCourse.id}`);
-      return tx.course.findFirst({ where: { id: newCourse.id }, ...{ include: COURSE_INCLUDE } }) as Promise<Course>;
+      const createdCourse = await tx.course.findFirst({ where: { id: newCourse.id }, ...{ include: COURSE_INCLUDE } });
+      return this.signCourseMediaUrls(createdCourse);
     });
   }
 
@@ -371,8 +377,9 @@ export class CourseService {
       prisma.course.count({ where }),
     ]);
 
+    const signedData = await Promise.all(data.map((c) => this.signCourseMediaUrls(c)));
     return {
-      data,
+      data: signedData,
       total,
       page: filters.page,
       limit: filters.limit,
@@ -392,14 +399,19 @@ export class CourseService {
             lessons: {
               where: { deletedAt: null },
               orderBy: { sortOrder: "asc" },
-              include: { resources: true },
+              include: {
+                video: true,
+                resources: {
+                  include: { file: true }
+                }
+              },
             },
           },
         },
       },
     });
     if (!course) throw new CourseNotFoundException();
-    return course;
+    return this.signCourseMediaUrls(course);
   }
 
   async findBySlug(slug: string): Promise<Course> {
@@ -414,14 +426,19 @@ export class CourseService {
             lessons: {
               where: { deletedAt: null },
               orderBy: { sortOrder: "asc" },
-              include: { resources: true },
+              include: {
+                video: true,
+                resources: {
+                  include: { file: true }
+                }
+              },
             },
           },
         },
       },
     });
     if (!course) throw new CourseNotFoundException(`Course with slug "${slug}" not found`);
-    return course;
+    return this.signCourseMediaUrls(course);
   }
 
   // ── Internal helpers ──────────────────────────────────────────────────────
@@ -438,6 +455,69 @@ export class CourseService {
       creates.push({ tagId: tag.id });
     }
     return creates;
+  }
+
+  public async signCourseMediaUrls(course: any): Promise<any> {
+    if (!course) return course;
+
+    // Sign thumbnail URL
+    if (course.thumbnail && course.thumbnail.key) {
+      try {
+        course.thumbnail.url = await ServiceContainer.storage.getSignedDownloadUrl(course.thumbnail.key, 3600);
+      } catch (err) {
+        ServiceContainer.logger.warn(`Failed to sign thumbnail URL for key: ${course.thumbnail.key}`, { error: String(err) });
+      }
+    }
+
+    // Sign previewVideo URL
+    if (course.previewVideo && course.previewVideo.key) {
+      try {
+        course.previewVideo.url = await ServiceContainer.storage.getSignedDownloadUrl(course.previewVideo.key, 3600);
+      } catch (err) {
+        ServiceContainer.logger.warn(`Failed to sign previewVideo URL for key: ${course.previewVideo.key}`, { error: String(err) });
+      }
+    }
+
+    // Also sign instructor avatar if available
+    if (course.instructor?.avatarFile?.key) {
+      try {
+        course.instructor.avatarFile.url = await ServiceContainer.storage.getSignedDownloadUrl(course.instructor.avatarFile.key, 3600);
+      } catch (err) {
+        // ignore
+      }
+    }
+
+    // Sign lesson videos and resources inside modules
+    if (course.modules && course.modules.length > 0) {
+      for (const mod of course.modules) {
+        if (mod.lessons && mod.lessons.length > 0) {
+          for (const lesson of mod.lessons) {
+            // Sign lesson video
+            if (lesson.video && lesson.video.key) {
+              try {
+                lesson.video.url = await ServiceContainer.storage.getSignedDownloadUrl(lesson.video.key, 3600);
+              } catch (err) {
+                // ignore
+              }
+            }
+            // Sign lesson resources
+            if (lesson.resources && lesson.resources.length > 0) {
+              for (const res of lesson.resources) {
+                if (res.file && res.file.key) {
+                  try {
+                    res.file.url = await ServiceContainer.storage.getSignedDownloadUrl(res.file.key, 3600);
+                  } catch (err) {
+                    // ignore
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return course;
   }
 }
 

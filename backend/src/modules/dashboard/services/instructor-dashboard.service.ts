@@ -12,6 +12,7 @@ import {
   CourseOwnershipException,
 } from "../errors/instructor-exceptions";
 import { ServiceContainer } from "@/services/shared/service-container";
+import { courseService } from "../../course/services/course.service";
 
 export class InstructorDashboardService {
   private verifyInstructorRole(role: string) {
@@ -60,6 +61,7 @@ export class InstructorDashboardService {
         where: { ...instructorFilter, deletedAt: null },
         include: {
           thumbnail: true,
+          category: true,
           modules: {
             where: { deletedAt: null },
             include: { lessons: { where: { deletedAt: null } } },
@@ -109,6 +111,20 @@ export class InstructorDashboardService {
       }),
     ]);
 
+    // Sign instructor avatar
+    if (instructor.avatarFile && instructor.avatarFile.key) {
+      try {
+        instructor.avatarFile.url = await ServiceContainer.storage.getSignedDownloadUrl(instructor.avatarFile.key, 3600);
+      } catch (err) {
+        // ignore
+      }
+    }
+
+    // Sign course media URLs
+    await Promise.all(
+      courses.map((c) => courseService.signCourseMediaUrls(c))
+    );
+
     // 1. Welcome
     const welcome = {
       instructorName: `${instructor.firstName} ${instructor.lastName}`,
@@ -132,6 +148,8 @@ export class InstructorDashboardService {
         thumbnailUrl: c.thumbnail?.url ?? null,
         modulesCount: c.modules.length,
         lessonsCount: c.modules.reduce((sum, m) => sum + m.lessons.length, 0),
+        difficulty: c.difficulty,
+        category: c.category ? { name: c.category.name } : null,
       })),
     };
 
@@ -295,7 +313,28 @@ export class InstructorDashboardService {
     const [course, cEnrollments, cCertificates, cQuizzes, cAssignments] = await Promise.all([
       prisma.course.findUnique({
         where: { id: courseId },
-        include: { modules: { include: { lessons: true } } },
+        include: {
+          modules: {
+            where: { deletedAt: null },
+            include: {
+              lessons: {
+                where: { deletedAt: null },
+                include: {
+                  video: true,
+                  resources: { include: { file: true } },
+                },
+                orderBy: { sortOrder: "asc" },
+              },
+            },
+            orderBy: { sortOrder: "asc" },
+          },
+          faqs: { orderBy: { sortOrder: "asc" } },
+          requirements: { orderBy: { sortOrder: "asc" } },
+          outcomes: { orderBy: { sortOrder: "asc" } },
+          tags: { include: { tag: true } },
+          thumbnail: true,
+          previewVideo: true,
+        },
       }),
       prisma.enrollment.findMany({
         where: { courseId, deletedAt: null },
@@ -317,6 +356,8 @@ export class InstructorDashboardService {
 
     if (!course) throw new NotFoundError("Course not found");
 
+    await courseService.signCourseMediaUrls(course);
+
     const totalStudents = cEnrollments.length;
     const completedStudents = cEnrollments.filter((e) => e.status === EnrollmentStatus.COMPLETED).length;
     const completionRate = totalStudents > 0 ? (completedStudents / totalStudents) * 100 : 0;
@@ -327,6 +368,24 @@ export class InstructorDashboardService {
       title: course.title,
       slug: course.slug,
       status: course.status,
+      description: course.description,
+      categoryId: course.categoryId,
+      difficulty: course.difficulty,
+      language: course.language,
+      visibility: course.visibility,
+      price: Number(course.price),
+      discountPrice: course.discountPrice ? Number(course.discountPrice) : null,
+      certificateEnabled: course.certificateEnabled,
+      seoTitle: course.seoTitle || "",
+      seoDescription: course.seoDescription || "",
+      seoKeywords: course.seoKeywords || "",
+      thumbnail: course.thumbnail,
+      previewVideo: course.previewVideo,
+      requirements: course.requirements,
+      outcomes: course.outcomes,
+      tags: course.tags.map((t) => t.tag),
+      faqs: course.faqs,
+      modules: course.modules,
       stats: {
         totalStudents,
         completionRate,

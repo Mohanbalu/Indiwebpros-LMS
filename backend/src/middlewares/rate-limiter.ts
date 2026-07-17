@@ -7,6 +7,7 @@ export const rateLimiter = rateLimit({
   max: APP_CONFIG.rateLimit.max,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test",
   handler: (req, res) => {
     ResponseBuilder.failure(res, 429, APP_CONFIG.rateLimit.message);
   },

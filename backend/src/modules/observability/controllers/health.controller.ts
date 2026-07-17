@@ -35,6 +35,26 @@ export class HealthController {
   }
 
   /**
+   * GET /health/email
+   * Detailed email provider health. Protected by admin auth or internal key.
+   */
+  static async getEmailHealth(_req: Request, res: Response): Promise<void> {
+    try {
+      const report = await HealthService.getEmailHealth();
+      const statusCode = report.status === "unhealthy" ? 503 : 200;
+      res.status(statusCode).json({ success: report.status !== "unhealthy", ...report });
+    } catch (error) {
+      res.status(503).json({
+        success: false,
+        status: "unhealthy",
+        timestamp: new Date().toISOString(),
+        message: "Email health check failed",
+        error: (error as Error).message,
+      });
+    }
+  }
+
+  /**
    * GET /health/live
    * Kubernetes liveness probe — is the process alive and not OOM?
    * Fast — no external calls. Returns 200 or 503.

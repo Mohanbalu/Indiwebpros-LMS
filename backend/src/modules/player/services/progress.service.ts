@@ -168,6 +168,15 @@ export class LearningProgressService {
     const courseId = lesson.module.courseId;
     await this.validateEnrollment(userId, courseId, role);
 
+    // Auto-update cached lesson duration in DB to match actual video file duration
+    if (input.durationSeconds > 0 && lesson.durationSeconds !== input.durationSeconds) {
+      await prisma.lesson.update({
+        where: { id: lesson.id },
+        data: { durationSeconds: input.durationSeconds },
+      });
+      lesson.durationSeconds = input.durationSeconds;
+    }
+
     const watchPercentage = (input.positionSeconds / input.durationSeconds) * 100;
     const isCompletedThreshold = watchPercentage >= 90.0;
 

@@ -115,8 +115,21 @@ export default function Courses() {
     ? ["All", ...categoryRes.data.map((c: any) => c.name)]
     : ["All", "Full Stack Development", "AI & Machine Learning", "Cloud Computing", "UI/UX Product Design"];
 
-  const rawCourses: CourseItem[] = coursesRes?.success && Array.isArray(coursesRes.courses)
-    ? coursesRes.courses
+  const rawCourses: CourseItem[] = coursesRes?.success && Array.isArray(coursesRes.data)
+    ? coursesRes.data.map((c: any) => ({
+        id: c.id,
+        title: c.title,
+        slug: c.slug,
+        description: c.shortDescription || c.description || "",
+        level: c.difficulty ? (c.difficulty.charAt(0) + c.difficulty.slice(1).toLowerCase()) : "Beginner",
+        price: c.price || 0,
+        duration: c.durationMinutes ? `${Math.round(c.durationMinutes / 60)} hrs` : "Self-paced",
+        rating: 4.8,
+        studentsCount: c._count?.enrollments || 0,
+        category: c.category || { name: "General" },
+        instructor: c.instructor || { firstName: "Unknown", lastName: "Instructor" },
+        createdAt: c.createdAt || new Date().toISOString(),
+      }))
     : fallbackCourses;
 
 

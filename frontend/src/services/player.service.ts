@@ -74,6 +74,7 @@ export interface LessonDetails {
   progress: LessonProgressData;
   isBookmarked: boolean;
   notes: NoteItem[];
+  quizId?: string | null;
 }
 
 export interface ResumeLearningItem {

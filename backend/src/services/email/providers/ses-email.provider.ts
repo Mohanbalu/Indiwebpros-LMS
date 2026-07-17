@@ -1,5 +1,7 @@
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { IEmailService } from "../interfaces/email-service.interface";
+import { EmailHealthChecker } from "../health/email-health-checker";
+import { EmailHealthReport, IEmailHealthService } from "../interfaces/email-health.interface";
 import { EmailConfig } from "../../shared/config.schema";
 import { ServiceContainer } from "../../shared/service-container";
 import { EmailSendException, ProviderException } from "../errors/email-exceptions";
@@ -7,10 +9,14 @@ import { TemplateEngine } from "../templates/template-engine";
 import { ILifecycleService } from "../../shared/lifecycle.interface";
 import { IHealthCheckService, HealthStatus } from "../../shared/health.interface";
 
-export class SESProvider implements IEmailService, ILifecycleService, IHealthCheckService {
+export class SESProvider implements IEmailService, ILifecycleService, IHealthCheckService, IEmailHealthService {
   private sesClient: SESClient | null = null;
+  private readonly healthChecker: EmailHealthChecker;
+  private emailHealthReport: EmailHealthReport | null = null;
 
-  constructor(private config: EmailConfig) {}
+  constructor(private config: EmailConfig) {
+    this.healthChecker = new EmailHealthChecker(config, "SES");
+  }
 
   async initialize(): Promise<void> {
     try {
@@ -19,7 +25,21 @@ export class SESProvider implements IEmailService, ILifecycleService, IHealthChe
         // Authentication uses AWS environment variables directly or IAM roles in production
       });
 
-      ServiceContainer.logger.info("SESProvider initialized successfully");
+      this.emailHealthReport = await this.healthChecker.check();
+      const logContext = {
+        provider: "ses",
+        host: this.config.smtpHost,
+        port: this.config.smtpPort,
+        connectionStatus: this.emailHealthReport.connectionStatus,
+        authenticationStatus: this.emailHealthReport.authenticationStatus,
+        error: this.emailHealthReport.errorMessage,
+      };
+
+      if (this.emailHealthReport.status === "healthy") {
+        ServiceContainer.logger.info("SESProvider initialized successfully", logContext);
+      } else {
+        ServiceContainer.logger.warn("SESProvider SMTP startup health check failed", logContext);
+      }
     } catch (error) {
       throw new ProviderException("Failed to initialize SESProvider", [error]);
     }
@@ -33,16 +53,28 @@ export class SESProvider implements IEmailService, ILifecycleService, IHealthChe
   }
 
   async health(): Promise<HealthStatus> {
-    try {
-      if (!this.sesClient) throw new Error("SESClient not initialized");
-      return { service: "EmailModule", status: "healthy", latency: 0, message: "SESClient initialized", timestamp: new Date().toISOString() };
-    } catch (error) {
-      return { service: "EmailModule", status: "unhealthy", latency: 0, message: (error as Error).message, timestamp: new Date().toISOString() };
+    const report = await this.getEmailHealth();
+    return {
+      service: "EmailModule",
+      status: report.status,
+      latency: report.latency,
+      message: report.status === "healthy" ? "SES SMTP connectivity established" : report.errorMessage ?? "SES SMTP health check failed",
+      timestamp: report.checkedAt,
+    };
+  }
+
+  async getEmailHealth(): Promise<EmailHealthReport> {
+    if (!this.sesClient) {
+      throw new Error("SESClient not initialized");
     }
+
+    this.emailHealthReport = await this.healthChecker.check();
+    return this.emailHealthReport;
   }
 
   async send(to: string, subject: string, body: string, options?: Record<string, unknown>): Promise<void> {
     if (!this.sesClient) throw new ProviderException("SESProvider is not initialized");
+    const startedAt = Date.now();
 
     try {
       const command = new SendEmailCommand({
@@ -74,7 +106,17 @@ export class SESProvider implements IEmailService, ILifecycleService, IHealthChe
 
       await this.sesClient.send(command);
 
-      ServiceContainer.logger.info(`Email sent successfully via SES to ${to}`);
+      ServiceContainer.logger.info(`Email sent successfully via SES to ${to}`, {
+        provider: "ses",
+        recipient: to,
+        messageType: (options?.emailType as string) || "transactional",
+        success: true,
+        latencyMs: Date.now() - startedAt,
+        sender: {
+          fromName: this.config.smtpFromName,
+          fromEmail: this.config.awsSesFromEmail,
+        },
+      });
       
       // Audit log success
       await ServiceContainer.audit.log({
@@ -86,7 +128,18 @@ export class SESProvider implements IEmailService, ILifecycleService, IHealthChe
         status: "SUCCESS"
       });
     } catch (error) {
-      ServiceContainer.logger.error(`Failed to send email to ${to} via SES`, { error });
+      ServiceContainer.logger.error(`Failed to send email to ${to} via SES`, {
+        error,
+        provider: "ses",
+        recipient: to,
+        messageType: (options?.emailType as string) || "transactional",
+        success: false,
+        latencyMs: Date.now() - startedAt,
+        sender: {
+          fromName: this.config.smtpFromName,
+          fromEmail: this.config.awsSesFromEmail,
+        },
+      });
       
       // Audit log failure
       await ServiceContainer.audit.log({

@@ -3,11 +3,31 @@
  * Registers all observability endpoints on the Express router.
  */
 
-import { Router } from "express";
+import { NextFunction, Request, Response, Router } from "express";
 import { HealthController } from "../controllers/health.controller";
 import { env } from "@/config/env";
+import { authGuard, authorize } from "@/middlewares/auth";
 
 const healthRouter = Router();
+
+const allowInternalOrAdmin = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  const expectedKey = process.env.INTERNAL_EMAIL_HEALTH_KEY || process.env.INTERNAL_METRICS_KEY;
+  const internalKey = req.header("x-internal-key");
+
+  if (expectedKey && internalKey === expectedKey) {
+    next();
+    return;
+  }
+
+  await authGuard(req, res, (authError?: unknown) => {
+    if (authError) {
+      next(authError);
+      return;
+    }
+
+    authorize(["Admin"])(req, res, next);
+  });
+};
 
 // ── Health Endpoints (All Public — no auth required) ──────────────────────────
 
@@ -16,6 +36,13 @@ const healthRouter = Router();
  * Full aggregate health check — all services.
  */
 healthRouter.get("/health", HealthController.getHealth);
+
+
+/**
+ * GET /health/email
+ * Detailed email provider health. Requires Admin auth or x-internal-key.
+ */
+healthRouter.get("/health/email", allowInternalOrAdmin, HealthController.getEmailHealth);
 
 /**
  * GET /health/live

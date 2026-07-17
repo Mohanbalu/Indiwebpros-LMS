@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import { env } from "@/config/env";
 import { prisma } from "@/database/client";
 import { User, Session } from "@/generated/client";
-import { emailService } from "./email.service";
+import { ServiceContainer } from "@/services/shared/service-container";
 import { UserAgentParser } from "@/utils/helpers";
 import { AuditService } from "./audit.service";
 import {
@@ -92,7 +92,7 @@ export class AuthService {
     });
 
     // Send Verification Email
-    await emailService.sendVerificationEmail(user.email, rawToken);
+    await ServiceContainer.email.sendVerification(user.email, rawToken);
   }
 
   static async login(
@@ -432,7 +432,7 @@ export class AuthService {
       success: true,
     });
 
-    await emailService.sendPasswordResetEmail(user.email, rawToken);
+    await ServiceContainer.email.sendPasswordReset(user.email, rawToken);
   }
 
   static async resetPassword(input: ResetPasswordInput): Promise<void> {
@@ -565,7 +565,7 @@ export class AuthService {
       success: true,
     });
 
-    await emailService.sendVerificationEmail(user.email, rawToken);
+    await ServiceContainer.email.sendVerification(user.email, rawToken);
   }
 
   static async changePassword(userId: string, input: ChangePasswordInput): Promise<void> {

@@ -21,8 +21,8 @@ router.post("/",              writeRl, authGuard, canManage, CourseController.cr
 router.put("/:id",            writeRl, authGuard, canManage, CourseController.update);
 router.patch("/:id/publish",  writeRl, authGuard, canManage, CourseController.publish);
 router.patch("/:id/archive",  writeRl, authGuard, canManage, CourseController.archive);
-router.post("/:id/duplicate", writeRl, authGuard, authorize(["Admin"]), CourseController.duplicate);
-router.delete("/:id",         writeRl, authGuard, authorize(["Admin"]), CourseController.delete);
+router.post("/:id/duplicate", writeRl, authGuard, canManage, CourseController.duplicate);
+router.delete("/:id",         writeRl, authGuard, canManage, CourseController.delete);
 
 // ── Modules (nested under course) ─────────────────────────────────────────
 router.get("/:courseId/modules",              readRl, authGuard, ModuleController.getByCourse);

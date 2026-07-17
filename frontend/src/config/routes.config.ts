@@ -25,4 +25,8 @@ export const ROUTES = {
   paymentSuccess: "/payments/success",
   paymentFailure: "/payments/failure",
   player: "/player/course",
+  quiz: "/player/quiz",
+  certificates: "/certificates",
+  certificateDetail: "/certificates/:id",
+  certificateVerify: "/verify/:code",
 } as const;

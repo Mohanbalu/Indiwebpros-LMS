@@ -1,17 +1,31 @@
-import { InfrastructureConfig } from "./config.schema";
-import { ServiceRegistry } from "./service-registry";
-import { ServiceContainer } from "./service-container";
+import { EmailConfig, InfrastructureConfig } from "./config.schema";
 import { ProviderInitializationException } from "./infrastructure-exceptions";
+import { ServiceContainer } from "./service-container";
+import { ServiceRegistry } from "./service-registry";
 
-import { PinoLoggerProvider } from "../logger";
-import { S3StorageProvider } from "../storage";
-import { SMTPProvider, SESProvider } from "../email";
-import { RazorpayProvider, StripeProvider } from "../payment";
-import { MemoryCacheProvider, RedisCacheProvider } from "../cache";
-import { BullMQProvider } from "../queue";
 import { DatabaseAuditProvider } from "../audit";
-import { DatabaseNotificationProvider } from "../notification";
+import { MemoryCacheProvider, RedisCacheProvider } from "../cache";
 import { PDFCertificateProvider } from "../certificate";
+import { BrevoSMTPProvider, SESProvider, SMTPProvider } from "../email";
+import { PinoLoggerProvider } from "../logger";
+import { DatabaseNotificationProvider } from "../notification";
+import { RazorpayProvider, StripeProvider } from "../payment";
+import { BullMQProvider } from "../queue";
+import { S3StorageProvider } from "../storage";
+
+export function createEmailProvider(config: EmailConfig) {
+  const provider = config.provider.toLowerCase();
+
+  if (provider === "ses") {
+    return new SESProvider(config);
+  }
+
+  if (provider === "brevo") {
+    return new BrevoSMTPProvider(config);
+  }
+
+  return new SMTPProvider(config);
+}
 
 export class ServiceFactory {
   static async initializeAll(): Promise<void> {
@@ -81,18 +95,13 @@ export class ServiceFactory {
       ServiceRegistry.setInitialized("storage", true);
 
       // 5. Email
-      let emailProvider;
-      if (config.email.provider.toLowerCase() === "ses") {
-        emailProvider = new SESProvider(config.email);
-      } else {
-        emailProvider = new SMTPProvider(config.email);
-      }
+      const emailProvider = createEmailProvider(config.email);
       await emailProvider.initialize();
       ServiceContainer.register("email", emailProvider);
       ServiceRegistry.register("email", {
         name: "email",
         version: "1.0.0",
-        providerName: emailProvider instanceof SESProvider ? "SESProvider" : "SMTPProvider",
+        providerName: emailProvider instanceof SESProvider ? "SESProvider" : emailProvider instanceof BrevoSMTPProvider ? "BrevoSMTPProvider" : "SMTPProvider",
         supportsHealth: true,
         supportsLifecycle: true,
         supportsMetrics: true,

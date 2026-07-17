@@ -23,6 +23,7 @@ const authRateLimiter = rateLimit({
   max: APP_CONFIG.authRateLimit.max,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test",
   handler: (req, res) => {
     ResponseBuilder.failure(
       res,

@@ -9,6 +9,7 @@ export const createLessonSchema = z.object({
   lessonType: z.nativeEnum(LessonType).default(LessonType.VIDEO),
   isPreview: z.boolean().default(false),
   sortOrder: z.coerce.number().int().min(0).default(0),
+  status: z.nativeEnum(LessonStatus).default(LessonStatus.DRAFT),
 });
 
 export const updateLessonSchema = createLessonSchema.partial();

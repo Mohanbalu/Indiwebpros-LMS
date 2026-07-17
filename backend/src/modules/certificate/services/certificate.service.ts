@@ -120,10 +120,15 @@ export class CertificateService {
       version: 1,
     });
 
-    return prisma.$transaction(async (tx) => {
-      // S3 QR Upload
-      const qrKey = `certificates/qr-${verificationCode}.png`;
-      const qrUpload = await ServiceContainer.storage.upload(qrBuffer, qrKey, { contentType: "image/png" });
+    // S3 QR Upload (Outside transaction to prevent Prisma interactive transaction timeout)
+    const qrKey = `certificates/qr-${verificationCode}.png`;
+    const qrUpload = await ServiceContainer.storage.upload(qrBuffer, qrKey, { contentType: "image/png" });
+
+    // S3 PDF Upload (Outside transaction to prevent Prisma interactive transaction timeout)
+    const pdfKey = `certificates/cert-${verificationCode}.pdf`;
+    const pdfUpload = await ServiceContainer.storage.upload(pdfBuffer, pdfKey, { contentType: "application/pdf" });
+
+    const cert = await prisma.$transaction(async (tx) => {
       const qrFile = await tx.file.create({
         data: {
           name: `qr-${verificationCode}.png`,
@@ -138,9 +143,6 @@ export class CertificateService {
         },
       });
 
-      // S3 PDF Upload
-      const pdfKey = `certificates/cert-${verificationCode}.pdf`;
-      const pdfUpload = await ServiceContainer.storage.upload(pdfBuffer, pdfKey, { contentType: "application/pdf" });
       const pdfFile = await tx.file.create({
         data: {
           name: `cert-${verificationCode}.pdf`,
@@ -156,7 +158,7 @@ export class CertificateService {
       });
 
       // Write Certificate
-      const cert = await tx.certificate.create({
+      const newCert = await tx.certificate.create({
         data: {
           userId,
           courseId,
@@ -175,41 +177,42 @@ export class CertificateService {
         },
       });
 
-      // Audit Log
-      try {
-        await ServiceContainer.audit.log({
-          userId: issuerId ?? userId,
-          action: "CERTIFICATE_GENERATED",
-          resource: "Certificate",
-          resourceId: cert.id,
-          details: { certificateNumber, version: 1 },
-          status: "SUCCESS",
-        });
-      } catch {}
-
-      // Notifications
-      try {
-        await ServiceContainer.notification.create({
-          userId,
-          title: "Certificate Issued! 🎓",
-          message: `Congratulations! Your official certificate for "${course.title}" is ready.`,
-          type: "CERTIFICATE" as any,
-          priority: "HIGH" as any,
-        });
-
-        // Email Notification
-        await ServiceContainer.email.send(
-          user.email,
-          `Certificate Ready: ${course.title}`,
-          `<p>Congratulations ${user.firstName}!</p>
-           <p>Your official completion credential for <b>${course.title}</b> is ready for download.</p>
-           <p>Certificate Number: <b>${certificateNumber}</b></p>
-           <p>You can verify your credential at: <a href="${verificationUrl}">${verificationUrl}</a></p>`
-        );
-      } catch {}
-
-      return cert;
+      return newCert;
     });
+
+    // Audit Log, Notification, and Email (Outside transaction to prevent locks and timeout errors)
+    try {
+      await ServiceContainer.audit.log({
+        userId: issuerId ?? userId,
+        action: "CERTIFICATE_GENERATED",
+        resource: "Certificate",
+        resourceId: cert.id,
+        details: { certificateNumber, version: 1 },
+        status: "SUCCESS",
+      });
+    } catch {}
+
+    try {
+      await ServiceContainer.notification.create({
+        userId,
+        title: "Certificate Issued! 🎓",
+        message: `Congratulations! Your official certificate for "${course.title}" is ready.`,
+        type: "CERTIFICATE" as any,
+        priority: "HIGH" as any,
+      });
+
+      // Email Notification
+      await ServiceContainer.email.send(
+        user.email,
+        `Certificate Ready: ${course.title}`,
+        `<p>Congratulations ${user.firstName}!</p>
+         <p>Your official completion credential for <b>${course.title}</b> is ready for download.</p>
+         <p>Certificate Number: <b>${certificateNumber}</b></p>
+         <p>You can verify your credential at: <a href="${verificationUrl}">${verificationUrl}</a></p>`
+      );
+    } catch {}
+
+    return cert;
   }
 
   async regenerateCertificate(certificateId: string, adminId: string): Promise<Certificate> {
@@ -252,10 +255,15 @@ export class CertificateService {
       version: nextVersion,
     });
 
-    return prisma.$transaction(async (tx) => {
-      // Re-upload QR Code File
-      const qrKey = `certificates/qr-${cert.verificationCode}-v${nextVersion}.png`;
-      const qrUpload = await ServiceContainer.storage.upload(qrBuffer, qrKey, { contentType: "image/png" });
+    // Re-upload QR Code File (Outside transaction to prevent Prisma interactive transaction timeout)
+    const qrKey = `certificates/qr-${cert.verificationCode}-v${nextVersion}.png`;
+    const qrUpload = await ServiceContainer.storage.upload(qrBuffer, qrKey, { contentType: "image/png" });
+
+    // Re-upload PDF (Outside transaction to prevent Prisma interactive transaction timeout)
+    const pdfKey = `certificates/cert-${cert.verificationCode}-v${nextVersion}.pdf`;
+    const pdfUpload = await ServiceContainer.storage.upload(pdfBuffer, pdfKey, { contentType: "application/pdf" });
+
+    const updated = await prisma.$transaction(async (tx) => {
       const qrFile = await tx.file.create({
         data: {
           name: `qr-${cert.verificationCode}-v${nextVersion}.png`,
@@ -270,9 +278,6 @@ export class CertificateService {
         },
       });
 
-      // Re-upload PDF
-      const pdfKey = `certificates/cert-${cert.verificationCode}-v${nextVersion}.pdf`;
-      const pdfUpload = await ServiceContainer.storage.upload(pdfBuffer, pdfKey, { contentType: "application/pdf" });
       const pdfFile = await tx.file.create({
         data: {
           name: `cert-${cert.verificationCode}-v${nextVersion}.pdf`,
@@ -288,7 +293,7 @@ export class CertificateService {
       });
 
       // Update certificate details
-      const updated = await tx.certificate.update({
+      const newUpdated = await tx.certificate.update({
         where: { id: certificateId },
         data: {
           qrCodeFileId: qrFile.id,
@@ -299,31 +304,32 @@ export class CertificateService {
         include: { pdfFile: true, qrCodeFile: true },
       });
 
-      // Audit Log
-      try {
-        await ServiceContainer.audit.log({
-          userId: adminId,
-          action: "CERTIFICATE_REGENERATED",
-          resource: "Certificate",
-          resourceId: cert.id,
-          details: { version: nextVersion },
-          status: "SUCCESS",
-        });
-      } catch {}
-
-      // Notification
-      try {
-        await ServiceContainer.notification.create({
-          userId: cert.userId,
-          title: "Certificate Updated 🔄",
-          message: `Your certificate for "${course.title}" has been updated to version ${nextVersion}.0.`,
-          type: "CERTIFICATE" as any,
-          priority: "NORMAL" as any,
-        });
-      } catch {}
-
-      return updated;
+      return newUpdated;
     });
+
+    // Audit Log and Notification (Outside transaction to prevent locks and timeout errors)
+    try {
+      await ServiceContainer.audit.log({
+        userId: adminId,
+        action: "CERTIFICATE_REGENERATED",
+        resource: "Certificate",
+        resourceId: cert.id,
+        details: { version: nextVersion },
+        status: "SUCCESS",
+      });
+    } catch {}
+
+    try {
+      await ServiceContainer.notification.create({
+        userId: cert.userId,
+        title: "Certificate Updated 🔄",
+        message: `Your certificate for "${course.title}" has been updated to version ${nextVersion}.0.`,
+        type: "CERTIFICATE" as any,
+        priority: "NORMAL" as any,
+      });
+    } catch {}
+
+    return updated;
   }
 
   async revokeCertificate(certificateId: string, reason: string, adminId: string): Promise<Certificate> {

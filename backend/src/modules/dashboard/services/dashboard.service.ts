@@ -144,26 +144,37 @@ export class StudentDashboardService {
     }
 
     // Format My Courses list
-    const myCourses = enrollments.map((e) => {
-      let totalLessons = 0;
-      e.course.modules.forEach((m) => {
-        totalLessons += m.lessons.length;
-      });
+    const myCourses = await Promise.all(
+      enrollments.map(async (e) => {
+        let totalLessons = 0;
+        e.course.modules.forEach((m) => {
+          totalLessons += m.lessons.length;
+        });
 
-      // Fetch progress
-      return {
-        id: e.id,
-        courseId: e.courseId,
-        title: e.course.title,
-        slug: e.course.slug,
-        thumbnailUrl: e.course.thumbnail?.url ?? null,
-        instructorName: `${e.course.instructor.firstName} ${e.course.instructor.lastName}`,
-        status: e.status,
-        expiresAt: e.expiresAt,
-        completionPercentage: e.progressPercentage,
-        totalLessons,
-      };
-    });
+        let thumbnailUrl = null;
+        if (e.course.thumbnail?.key) {
+          try {
+            thumbnailUrl = await ServiceContainer.storage.getSignedDownloadUrl(e.course.thumbnail.key, 3600);
+          } catch (err) {
+            thumbnailUrl = e.course.thumbnail.url;
+          }
+        }
+
+        // Fetch progress
+        return {
+          id: e.id,
+          courseId: e.courseId,
+          title: e.course.title,
+          slug: e.course.slug,
+          thumbnailUrl,
+          instructorName: `${e.course.instructor.firstName} ${e.course.instructor.lastName}`,
+          status: e.status,
+          expiresAt: e.expiresAt,
+          completionPercentage: e.progressPercentage,
+          totalLessons,
+        };
+      })
+    );
 
     // Format Statistics block
     const completedCoursesCount = enrollments.filter((e) => e.status === EnrollmentStatus.COMPLETED).length;

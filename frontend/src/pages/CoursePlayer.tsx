@@ -1,25 +1,19 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import {
-  Play,
-  CheckCircle2,
-  Award,
   LogOut,
   ArrowLeft,
   BookOpen,
-  ChevronRight,
   Bookmark,
   BookmarkCheck,
-  FileText,
-  Clock,
   Menu,
-  X,
-  Sparkles,
   Info
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Spinner } from "@/components/ui/Spinner";
 import { useAuth } from "@/context/AuthContext";
 import { ROUTES } from "@/config/routes.config";
+import { APP_CONFIG } from "@/config/app.config";
 
 // Services, Hooks & Components
 import {
@@ -36,6 +30,15 @@ import {
   useTrackDownload,
   useResumeLearning
 } from "@/hooks/usePlayer";
+import { useDashboard } from "@/hooks/useDashboard";
+import { useMyCertificates, useGenerateStudentCertificate } from "@/hooks/useCertificate";
+import {
+  useStartQuizAttempt,
+  useResumeQuizAttempt,
+  useSubmitQuizAttempt,
+  useQuizAttemptResult,
+  useQuizDetail,
+} from "@/hooks/useQuiz";
 import { CourseSidebar } from "@/components/player/CourseSidebar";
 import { VideoPlayerPanel } from "@/components/player/VideoPlayerPanel";
 import { PdfPlayerPanel } from "@/components/player/PdfPlayerPanel";
@@ -45,49 +48,198 @@ import { BookmarkPanel } from "@/components/player/BookmarkPanel";
 import { ResourceList } from "@/components/player/ResourceList";
 import { CompletionDialog } from "@/components/player/CompletionDialog";
 import { PlayerLesson } from "@/services/player.service";
+import { QuizIntro } from "@/components/quiz/QuizIntro";
+import { QuizPlayer } from "@/components/quiz/QuizPlayer";
+import { ResultPage } from "@/components/quiz/ResultPage";
+import { ReviewMode } from "@/components/quiz/ReviewMode";
+import type {
+  StartAttemptResponse,
+  ResumeAttemptFinished,
+  LocalAnswer,
+  QuizPersistence,
+  QuizAttemptMeta,
+  AttemptResultResponse,
+} from "@/types/quiz.types";
+import { QUIZ_STORAGE_KEY } from "@/types/quiz.types";
+
+type QuizView = "intro" | "playing" | "result" | "review";
 
 export default function CoursePlayer() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { logout } = useAuth();
-  const queryClientRef = useRef(false);
 
-  // Read courseId from query params
   const courseId = searchParams.get("courseId") || "";
-
-  // Resume learning query to fetch course list fallback if courseId is missing
   const { data: resumeList } = useResumeLearning();
+  const { data: dashboardData } = useDashboard();
 
-  // Redirect to most recently viewed course if no courseId is provided
   useEffect(() => {
-    if (!courseId && resumeList && resumeList.length > 0) {
-      setSearchParams({ courseId: resumeList[0].courseId });
+    if (!courseId) {
+      if (resumeList && resumeList.length > 0 && resumeList[0]) {
+        setSearchParams({ courseId: resumeList[0].courseId });
+      } else if (dashboardData?.myCourses && dashboardData.myCourses.length > 0 && dashboardData.myCourses[0]) {
+        setSearchParams({ courseId: dashboardData.myCourses[0].courseId });
+      }
     }
-  }, [courseId, resumeList, setSearchParams]);
+  }, [courseId, resumeList, dashboardData, setSearchParams]);
 
-  // Main Queries
   const {
     data: structure,
     isLoading: isStructureLoading,
     error: structureError
   } = useCourseStructure(courseId);
 
-  // States
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
+  const {
+    data: lesson,
+    isLoading: isLessonLoading,
+    error: lessonError
+  } = useLessonDetails(activeLessonId || "", !!activeLessonId);
   const [currentTimestamp, setCurrentTimestamp] = useState(0);
   const [activeTab, setActiveTab] = useState<"overview" | "resources" | "notes" | "bookmarks" | "quiz">("overview");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [completionCelebrated, setCompletionCelebrated] = useState(false);
   const [isCompletionDialogOpen, setIsCompletionDialogOpen] = useState(false);
 
-  // E2E Simulation States for Quiz
-  const [quizStarted, setQuizStarted] = useState<boolean>(false);
-  const [quizSubmitted, setQuizSubmitted] = useState<boolean>(false);
-  const [quizScore, setQuizScore] = useState<string>("");
-  const [certificateGenerating, setCertificateGenerating] = useState<boolean>(false);
-  const [certificateLink, setCertificateLink] = useState<string>("");
+  const [quizView, setQuizView] = useState<QuizView>("intro");
+  const [quizAttempt, setQuizAttempt] = useState<StartAttemptResponse | null>(null);
+  const [quizResultId, setQuizResultId] = useState<string>("");
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, LocalAnswer>>({});
+  const [quizMarked, setQuizMarked] = useState<string[]>([]);
+  const [quizCurrentIndex, setQuizCurrentIndex] = useState(0);
+  const [quizPassed, setQuizPassed] = useState(false);
 
-  // Auto-resume logic: pick lastAccessedLessonId or first unlocked lesson
+  const startQuizMut = useStartQuizAttempt();
+  const submitQuizMut = useSubmitQuizAttempt();
+  const { data: quizResult } = useQuizAttemptResult(quizResultId, quizView === "review");
+
+  const startAttemptPersistedRef = useRef<QuizPersistence | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(QUIZ_STORAGE_KEY);
+      if (stored) {
+        const parsed: QuizPersistence = JSON.parse(stored);
+        startAttemptPersistedRef.current = parsed;
+      }
+    } catch { /* noop */ }
+  }, []);
+
+  const activeLessonQuizId = lesson?.quizId || null;
+  const isQuizLesson = lesson?.lessonType === "QUIZ";
+
+  const { data: resumedQuizData, isLoading: quizResuming } = useResumeQuizAttempt(
+    startAttemptPersistedRef.current?.attemptId || "",
+    !!startAttemptPersistedRef.current?.attemptId && activeTab === "quiz" && quizView === "intro"
+  );
+
+  useEffect(() => {
+    if (!resumedQuizData || quizAttempt) return;
+
+    const finishedCheck = resumedQuizData as ResumeAttemptFinished;
+    if ("finished" in finishedCheck && finishedCheck.finished) {
+      setQuizResultId(finishedCheck.attempt.id);
+      setQuizView("result");
+      localStorage.removeItem(QUIZ_STORAGE_KEY);
+      startAttemptPersistedRef.current = null;
+      return;
+    }
+
+    const attemptData = resumedQuizData as StartAttemptResponse;
+    setQuizAttempt(attemptData);
+    if (startAttemptPersistedRef.current) {
+      setQuizAnswers(startAttemptPersistedRef.current.answers);
+      setQuizMarked(startAttemptPersistedRef.current.markedForReview);
+      setQuizCurrentIndex(startAttemptPersistedRef.current.currentQuestionIndex);
+    }
+    setQuizView("playing");
+  }, [resumedQuizData, quizAttempt]);
+
+  const quizAttemptHistory: QuizAttemptMeta[] = [];
+  const quizAttemptsRemaining = 3;
+
+  const handleStartQuiz = useCallback(async () => {
+    const quizIdToUse = activeLessonQuizId;
+    if (!quizIdToUse) return;
+    try {
+      const data = await startQuizMut.mutateAsync(quizIdToUse);
+      setQuizAttempt(data);
+      setQuizAnswers({});
+      setQuizMarked([]);
+      setQuizCurrentIndex(0);
+      const persistence: QuizPersistence = {
+        attemptId: data.attemptId,
+        quizId: data.quizId,
+        answers: {},
+        currentQuestionIndex: 0,
+        markedForReview: [],
+        startedAt: data.startedAt,
+      };
+      localStorage.setItem(QUIZ_STORAGE_KEY, JSON.stringify(persistence));
+      setQuizView("playing");
+    } catch { /* noop */ }
+  }, [activeLessonQuizId, startQuizMut]);
+
+  const handleQuizAnswersChange = useCallback(
+    (answers: Record<string, LocalAnswer>, marked: string[], currentIndex: number) => {
+      setQuizAnswers(answers);
+      setQuizMarked(marked);
+      setQuizCurrentIndex(currentIndex);
+      if (quizAttempt) {
+        const persistence: QuizPersistence = {
+          attemptId: quizAttempt.attemptId,
+          quizId: quizAttempt.quizId,
+          answers,
+          currentQuestionIndex: currentIndex,
+          markedForReview: marked,
+          startedAt: quizAttempt.startedAt,
+        };
+        localStorage.setItem(QUIZ_STORAGE_KEY, JSON.stringify(persistence));
+      }
+    },
+    [quizAttempt]
+  );
+
+  const handleQuizSubmit = useCallback(
+    async (answerList: LocalAnswer[]) => {
+      if (!quizAttempt) return;
+      try {
+        const result = await submitQuizMut.mutateAsync({
+          attemptId: quizAttempt.attemptId,
+          answers: answerList,
+        });
+        if (result.passed) {
+          setQuizPassed(true);
+        }
+        setQuizResultId(quizAttempt.attemptId);
+        localStorage.removeItem(QUIZ_STORAGE_KEY);
+        setQuizView("result");
+      } catch { /* noop */ }
+    },
+    [quizAttempt, submitQuizMut]
+  );
+
+  const handleQuizTimeUp = useCallback(async () => {
+    if (!quizAttempt) return;
+    try {
+      await submitQuizMut.mutateAsync({
+        attemptId: quizAttempt.attemptId,
+        answers: [],
+      });
+      setQuizResultId(quizAttempt.attemptId);
+      localStorage.removeItem(QUIZ_STORAGE_KEY);
+      setQuizView("result");
+    } catch { /* noop */ }
+  }, [quizAttempt, submitQuizMut]);
+
+  const handleQuizRetry = useCallback(() => {
+    setQuizAttempt(null);
+    setQuizAnswers({});
+    setQuizMarked([]);
+    setQuizCurrentIndex(0);
+    setQuizView("intro");
+  }, []);
+
   useEffect(() => {
     if (structure && !activeLessonId) {
       const lastLessonId = structure.progress?.lastLessonId;
@@ -101,19 +253,10 @@ export default function CoursePlayer() {
     }
   }, [structure, activeLessonId]);
 
-  // Lesson details query
-  const {
-    data: lesson,
-    isLoading: isLessonLoading,
-    error: lessonError
-  } = useLessonDetails(activeLessonId || "", !!activeLessonId);
 
-  // Progress mutations
   const updateVideoProgress = useUpdateVideoProgress();
   const updatePdfProgress = useUpdatePdfProgress();
   const updateArticleProgress = useUpdateArticleProgress();
-
-  // Note & Bookmark mutations
   const addBookmark = useAddBookmark();
   const removeBookmark = useRemoveBookmark();
   const createNote = useCreateNote();
@@ -121,7 +264,20 @@ export default function CoursePlayer() {
   const deleteNote = useDeleteNote();
   const trackDownload = useTrackDownload();
 
-  // Compute Unlocked Lessons list (Sequential locking helper)
+  const { data: certificatesList, refetch: refetchCertificates } = useMyCertificates();
+  const generateCertificateMut = useGenerateStudentCertificate();
+  const activeCourseCertificate = certificatesList?.find((c) => c.course.id === courseId);
+
+  const handleGenerateCertificate = async () => {
+    if (!courseId || generateCertificateMut.isPending) return;
+    try {
+      await generateCertificateMut.mutateAsync(courseId);
+      refetchCertificates();
+    } catch (err) {
+      console.error("Failed to generate certificate:", err);
+    }
+  };
+
   const unlockedLessonIds = new Set<string>();
   const flatLessons: PlayerLesson[] = [];
   if (structure) {
@@ -132,7 +288,8 @@ export default function CoursePlayer() {
     });
   }
 
-  // Populate unlockedSet sequentially
+  const hasQuizLessons = flatLessons.some((l) => l.lessonType === "QUIZ");
+
   let allPreviousCompleted = true;
   flatLessons.forEach((l, idx) => {
     if (idx === 0 || allPreviousCompleted) {
@@ -143,8 +300,9 @@ export default function CoursePlayer() {
     }
   });
 
-  // Watch for 100% course progress completion to launch celebration dialog
-  const progressPercentage = structure?.progress?.progressPercentage || 0;
+  const totalLessonsCount = flatLessons.length;
+  const completedLessonsCount = flatLessons.filter((l) => l.progress?.completed).length;
+  const progressPercentage = totalLessonsCount > 0 ? (completedLessonsCount / totalLessonsCount) * 100 : 0;
   const isCourseComplete = progressPercentage === 100;
 
   useEffect(() => {
@@ -161,7 +319,7 @@ export default function CoursePlayer() {
   };
 
   const handleVideoProgress = (position: number, duration: number) => {
-    if (!activeLessonId) return;
+    if (!activeLessonId || !duration || isNaN(duration) || duration <= 0) return;
     updateVideoProgress.mutate({
       lessonId: activeLessonId,
       positionSeconds: position,
@@ -170,7 +328,7 @@ export default function CoursePlayer() {
   };
 
   const handlePdfProgress = (page: number, total: number) => {
-    if (!activeLessonId) return;
+    if (!activeLessonId || !total || isNaN(total) || total <= 0) return;
     updatePdfProgress.mutate({
       lessonId: activeLessonId,
       pageNumber: page,
@@ -199,10 +357,9 @@ export default function CoursePlayer() {
     try {
       await logout();
       navigate(ROUTES.login);
-    } catch {}
+    } catch { /* noop */ }
   };
 
-  // Navigations helper
   const handleNextLesson = () => {
     if (!structure || !activeLessonId) return;
     const currentIdx = flatLessons.findIndex((l) => l.id === activeLessonId);
@@ -221,6 +378,128 @@ export default function CoursePlayer() {
       handleSelectLesson(flatLessons[currentIdx - 1]);
     }
   };
+
+  const renderQuizTab = () => {
+    if (quizView === "playing" && quizAttempt) {
+      return (
+        <QuizPlayer
+          questions={quizAttempt.questions}
+          attemptId={quizAttempt.attemptId}
+          quizId={quizAttempt.quizId}
+          title={quizAttempt.title}
+          startedAt={quizAttempt.startedAt}
+          timeLimitMinutes={quizAttempt.timeLimitMinutes}
+          initialAnswers={quizAnswers}
+          initialMarked={quizMarked}
+          initialIndex={quizCurrentIndex}
+          onAnswersChange={handleQuizAnswersChange}
+          onSubmit={handleQuizSubmit}
+          onTimeUp={handleQuizTimeUp}
+          isSubmitting={submitQuizMut.isPending}
+        />
+      );
+    }
+
+    if (quizView === "result" && quizAttempt) {
+      return (
+        <ResultPage
+          result={{
+            id: quizAttempt.attemptId,
+            userId: "",
+            quizId: quizAttempt.quizId,
+            attemptNumber: quizAttempt.attemptNumber,
+            startedAt: quizAttempt.startedAt,
+            submittedAt: new Date().toISOString(),
+            timeTakenSeconds: 0,
+            score: 0,
+            percentage: 0,
+            passed: false,
+            status: "SUBMITTED",
+          }}
+          totalQuestions={quizAttempt.questions.length}
+          onReview={() => setQuizView("review")}
+          onRetry={handleQuizRetry}
+          canRetry={quizAttemptsRemaining > 0}
+          attemptsRemaining={quizAttemptsRemaining}
+        />
+      );
+    }
+
+    if (quizView === "review" && quizResult && "quiz" in quizResult) {
+      return (
+        <ReviewMode
+          result={quizResult as AttemptResultResponse}
+          onBack={() => setQuizView("result")}
+        />
+      );
+    }
+
+    if (quizResuming) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center space-y-3">
+            <Spinner size="md" />
+            <p className="text-xs text-zinc-500 font-bold">Resuming your attempt...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (isQuizLesson && activeLessonQuizId) {
+      return (
+        <QuizIntroInline
+          quizId={activeLessonQuizId}
+          onStart={handleStartQuiz}
+          isLoading={startQuizMut.isPending}
+          attemptHistory={quizAttemptHistory}
+          maxAttempts={3}
+          attemptsRemaining={quizAttemptsRemaining}
+        />
+      );
+    }
+
+    return (
+      <div className="max-w-xl p-6 bg-zinc-900 border border-zinc-800 rounded-3xl">
+        <div className="text-center space-y-4 py-4">
+          <BookOpen className="h-10 w-10 text-blue-500 mx-auto" />
+          <h3 className="text-sm font-bold">Ready to test your comprehension?</h3>
+          <p className="text-xs text-zinc-500">Complete the auto-graded multi-choice quiz below.</p>
+          <Button onClick={() => {}} className="start-quiz-btn" disabled>
+            Start Quiz
+          </Button>
+          <p className="text-[10px] text-zinc-600">
+            Navigate to the quiz lesson in the sidebar to begin the assessment.
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  if (!courseId) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-zinc-50 flex items-center justify-center p-6">
+        <div className="w-full max-w-sm text-center space-y-4 p-8 bg-zinc-900 border border-zinc-800 rounded-3xl">
+          <BookOpen className="h-10 w-10 text-blue-500 mx-auto" />
+          <h2 className="text-sm font-bold">Select a Course to Learn</h2>
+          <p className="text-xs text-zinc-450">
+            You don't have an active course session. Choose a course from your dashboard or browse the catalog.
+          </p>
+          <div className="flex flex-col gap-2 pt-2">
+            <Link to="/student">
+              <Button size="sm" variant="primary" className="w-full">
+                Go to Dashboard
+              </Button>
+            </Link>
+            <Link to="/courses">
+              <Button size="sm" variant="outline" className="w-full">
+                Browse Course Catalog
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isStructureLoading) {
     return (
@@ -254,22 +533,20 @@ export default function CoursePlayer() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-50 flex flex-col h-screen overflow-hidden">
-      {/* 1. Header Navigation Bar */}
-      <header className="h-16 border-b border-zinc-800 bg-zinc-900 px-6 flex items-center justify-between flex-shrink-0 z-30">
+      <header className="h-16 border-b border-zinc-800/80 bg-zinc-950 px-6 flex items-center justify-between flex-shrink-0 z-30 shadow-md">
         <div className="flex items-center gap-4 min-w-0">
           <Link
             to="/student"
-            className="flex items-center gap-1.5 text-zinc-400 hover:text-zinc-50 text-xs font-bold transition flex-shrink-0"
+            className="flex items-center gap-1.5 text-zinc-400 hover:text-zinc-100 text-xs font-black tracking-tight transition flex-shrink-0"
           >
-            <ArrowLeft className="h-4 w-4" /> Exit Player
+            <ArrowLeft className="h-4 w-4 text-blue-500" /> Exit Player
           </Link>
-          <span className="h-4 w-px bg-zinc-800 flex-shrink-0" />
-          <h1 className="text-sm font-bold truncate pr-4 text-zinc-200">
+          <span className="h-4 w-px bg-zinc-800/80 flex-shrink-0" />
+          <h1 className="text-xs font-extrabold tracking-wide uppercase pr-4 text-zinc-300">
             {structure.title}
           </h1>
         </div>
 
-        {/* Profile Logout */}
         <div className="flex items-center gap-3">
           <button
             onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
@@ -294,9 +571,7 @@ export default function CoursePlayer() {
         </div>
       </header>
 
-      {/* 2. Main Content Split View */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Mobile drawer overlay */}
         {mobileSidebarOpen && (
           <div
             onClick={() => setMobileSidebarOpen(false)}
@@ -304,7 +579,6 @@ export default function CoursePlayer() {
           />
         )}
 
-        {/* Curriculum Sidebar */}
         <div
           className={`fixed inset-y-16 left-0 z-40 transform lg:static lg:translate-x-0 transition duration-300 flex-shrink-0 ${
             mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -318,7 +592,6 @@ export default function CoursePlayer() {
           />
         </div>
 
-        {/* Main lesson detail focus panel */}
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-zinc-950">
           <div className="flex-1 flex flex-col p-4 md:p-6 overflow-y-auto space-y-6 scrollbar-thin">
             {isLessonLoading ? (
@@ -340,7 +613,6 @@ export default function CoursePlayer() {
               </div>
             ) : (
               <>
-                {/* Lesson Header */}
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-lg font-black text-zinc-100">{lesson.title}</h2>
@@ -349,7 +621,6 @@ export default function CoursePlayer() {
                     </span>
                   </div>
 
-                  {/* Bookmark action icon */}
                   <button
                     onClick={toggleBookmark}
                     className="p-2.5 rounded-xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800/80 transition text-zinc-400 hover:text-blue-500 focus:outline-none"
@@ -362,11 +633,10 @@ export default function CoursePlayer() {
                   </button>
                 </div>
 
-                {/* Main Media Player Viewport */}
-                <div className="w-full">
+                <div className="w-full rounded-2xl overflow-hidden border border-zinc-800/85 bg-zinc-950 shadow-[0_15px_35px_rgba(0,0,0,0.4)]">
                   {lesson.lessonType === "VIDEO" && lesson.videoUrl && (
                     <VideoPlayerPanel
-                      videoUrl={lesson.videoUrl}
+                      videoUrl={`${APP_CONFIG.apiBaseUrl}/player/video-stream/${lesson.id}?token=${localStorage.getItem("token") || ""}`}
                       initialPosition={lesson.progress?.lastPositionSeconds || 0}
                       onProgress={handleVideoProgress}
                       onTimeUpdate={setCurrentTimestamp}
@@ -392,31 +662,33 @@ export default function CoursePlayer() {
                   )}
                 </div>
 
-                {/* Lesson Navigation Buttons */}
-                <div className="flex items-center justify-between border-t border-zinc-900 pt-6">
-                  <Button
-                    variant="outline"
-                    size="sm"
+                <div className="flex items-center justify-between border-t border-zinc-900/60 pt-6">
+                  <button
                     onClick={handlePrevLesson}
                     disabled={flatLessons.findIndex((l) => l.id === activeLessonId) === 0}
+                    className="px-5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-1.5 border border-zinc-800 bg-zinc-900 hover:bg-zinc-850 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed hover:-translate-y-0.5 active:translate-y-0 text-zinc-300"
                   >
-                    Previous Lesson
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleNextLesson}
-                    disabled={
-                      flatLessons.findIndex((l) => l.id === activeLessonId) === flatLessons.length - 1 ||
-                      !unlockedLessonIds.has(
-                        flatLessons[flatLessons.findIndex((l) => l.id === activeLessonId) + 1]?.id
-                      )
-                    }
-                  >
-                    Next Lesson
-                  </Button>
+                    ← Previous Lesson
+                  </button>
+                  {flatLessons.findIndex((l) => l.id === activeLessonId) < flatLessons.length - 1 ? (
+                    <button
+                      onClick={handleNextLesson}
+                      disabled={
+                        !unlockedLessonIds.has(
+                          flatLessons[flatLessons.findIndex((l) => l.id === activeLessonId) + 1]?.id
+                        )
+                      }
+                      className="px-6 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:-translate-y-0.5 active:translate-y-0 shadow-lg hover:shadow-blue-500/10"
+                    >
+                      Next Lesson →
+                    </button>
+                  ) : (
+                    <div className="px-5 py-2.5 text-xs font-black uppercase text-zinc-500 border border-zinc-800/80 bg-zinc-900/40 rounded-xl tracking-wider select-none">
+                      End of Pathway
+                    </div>
+                  )}
                 </div>
 
-                {/* Tabs Panel */}
                 <div className="border-b border-zinc-800/80 flex gap-4 mt-8 flex-wrap">
                   {[
                     { id: "overview", label: "Overview" },
@@ -427,7 +699,7 @@ export default function CoursePlayer() {
                   ].map((tab) => (
                     <button
                       key={tab.id}
-                      onClick={() => setActiveTab(tab.id as any)}
+                      onClick={() => setActiveTab(tab.id as "overview" | "resources" | "notes" | "bookmarks" | "quiz")}
                       className={`pb-3 text-xs font-bold focus:outline-none transition relative ${
                         activeTab === tab.id
                           ? "text-blue-500 border-b-2 border-blue-500"
@@ -439,7 +711,6 @@ export default function CoursePlayer() {
                   ))}
                 </div>
 
-                {/* Tab content wrappers */}
                 <div className="py-4">
                   {activeTab === "overview" && (
                     <div className="space-y-4 max-w-3xl">
@@ -491,72 +762,8 @@ export default function CoursePlayer() {
                   )}
 
                   {activeTab === "quiz" && (
-                    <div className="max-w-xl p-6 bg-zinc-900 border border-zinc-800 rounded-3xl">
-                      {!quizStarted ? (
-                        <div className="text-center space-y-4 py-4">
-                          <BookOpen className="h-10 w-10 text-blue-500 mx-auto" />
-                          <h3 className="text-sm font-bold">Ready to test your comprehension?</h3>
-                          <p className="text-xs text-zinc-500">Complete the auto-graded multi-choice quiz below.</p>
-                          <Button onClick={() => setQuizStarted(true)} className="start-quiz-btn">
-                            Start Quiz
-                          </Button>
-                        </div>
-                      ) : !quizSubmitted ? (
-                        <div className="space-y-6">
-                          <h3 className="text-sm font-bold">Question 1: Which Prisma configuration sets a unique row parameter?</h3>
-                          <div className="space-y-3">
-                            <label className="flex items-center gap-3 p-3 bg-zinc-850 hover:bg-zinc-800 border border-zinc-800 rounded-xl cursor-pointer">
-                              <input type="radio" name="quiz-opt" className="text-blue-600 focus:ring-0" />
-                              <span className="text-xs font-semibold">@relation</span>
-                            </label>
-                            <label className="flex items-center gap-3 p-3 bg-zinc-850 hover:bg-zinc-800 border border-zinc-800 rounded-xl cursor-pointer">
-                              <input type="radio" name="quiz-opt" className="text-blue-600 focus:ring-0" />
-                              <span className="text-xs font-semibold">@unique</span>
-                            </label>
-                          </div>
-                          <Button
-                            onClick={() => {
-                              setQuizSubmitted(true);
-                              setQuizScore("Passed");
-                            }}
-                            className="submit-quiz-btn w-full"
-                          >
-                            Submit Answers
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="text-center space-y-6 py-4">
-                          <Award className="h-10 w-10 text-emerald-500 mx-auto animate-bounce" />
-                          <h3 className="text-sm font-bold">Quiz Attempt Results</h3>
-                          <div className="text-lg font-black text-emerald-500 quiz-score">{quizScore}</div>
-
-                          {/* Certificate generation controls */}
-                          {!certificateLink ? (
-                            <Button
-                              onClick={() => {
-                                setCertificateGenerating(true);
-                                setTimeout(() => {
-                                  setCertificateGenerating(false);
-                                  setCertificateLink("https://indiwebpros.s3.amazonaws.com/certificates/sample.pdf");
-                                }, 1000);
-                              }}
-                              className="generate-certificate-btn"
-                              disabled={certificateGenerating}
-                            >
-                              {certificateGenerating ? "Compiling Certificate..." : "Generate Certificate"}
-                            </Button>
-                          ) : (
-                            <a
-                              href={certificateLink}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-xs font-bold rounded-xl transition certificate-download-link"
-                            >
-                              Download PDF Certificate
-                            </a>
-                          )}
-                        </div>
-                      )}
+                    <div className="max-w-2xl">
+                      {renderQuizTab()}
                     </div>
                   )}
                 </div>
@@ -564,44 +771,71 @@ export default function CoursePlayer() {
             )}
           </div>
 
-          {/* 3. Right Sidebar widgets (Overall pathway details) */}
-          <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-zinc-800 bg-zinc-900/40 p-4 md:p-6 space-y-6 flex-shrink-0 overflow-y-auto">
-            {/* Progress Card */}
-            <div className="p-4 rounded-2xl border border-zinc-850 bg-zinc-900/60 shadow-sm space-y-3">
-              <h3 className="text-xs font-black uppercase text-zinc-400 dark:text-zinc-500 tracking-wider">
+          <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-zinc-850 bg-zinc-950 p-4 md:p-6 space-y-6 flex-shrink-0 overflow-y-auto">
+            <div className="p-5 rounded-3xl border border-zinc-800/80 bg-gradient-to-br from-zinc-900/80 to-zinc-950/80 backdrop-blur-md shadow-xl space-y-4">
+              <h3 className="text-[10px] font-extrabold uppercase text-zinc-500 tracking-widest">
                 Overall Progress
               </h3>
               <div className="flex items-end justify-between">
-                <span className="text-2xl font-black text-white">{Math.round(progressPercentage)}%</span>
+                <span className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400">
+                  {Math.round(progressPercentage)}%
+                </span>
                 <span className="text-[10px] font-bold text-zinc-500">
-                  {structure.progress?.completedLessons} / {structure.progress?.totalLessons} Lessons
+                  {completedLessonsCount} / {totalLessonsCount} Lessons
                 </span>
               </div>
-              <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+              <div className="w-full h-2 bg-zinc-800/60 rounded-full overflow-hidden p-[1px]">
                 <div
-                  className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                  className="h-full rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 shadow-[0_0_12px_rgba(99,102,241,0.4)] transition-all duration-500 ease-out"
                   style={{ width: `${progressPercentage}%` }}
                 />
               </div>
             </div>
 
-            {/* General pathway metrics info */}
-            <div className="space-y-4">
-              <h4 className="text-[10px] font-black uppercase text-zinc-450 tracking-widest">
-                Course Details
+            <div className="p-5 rounded-3xl border border-zinc-800/80 bg-gradient-to-br from-zinc-900/80 to-zinc-950/80 backdrop-blur-md shadow-xl space-y-4">
+              <h4 className="text-[10px] font-extrabold uppercase text-zinc-500 tracking-widest">
+                Pathway Info
               </h4>
-              <div className="space-y-3 text-xs text-zinc-400">
-                <div className="flex items-center justify-between">
+              <div className="space-y-3.5 text-xs text-zinc-450">
+                <div className="flex items-center justify-between border-b border-zinc-800/40 pb-2">
                   <span>Pathway Status:</span>
-                  <span className="font-bold text-zinc-200">
-                    {isCourseComplete ? "Completed" : "In Progress"}
+                  <span className={`font-black text-[10px] px-2 py-0.5 rounded-full ${
+                    isCourseComplete 
+                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
+                      : "bg-blue-500/10 text-blue-450 border border-blue-500/20"
+                  }`}>
+                    {isCourseComplete ? "Completed" : "Active"}
                   </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span>Certificate status:</span>
-                  <span className="font-bold text-zinc-200">
-                    {isCourseComplete ? "Unlocked" : "Locked (Complete lessons)"}
-                  </span>
+                <div className="flex items-center justify-between pt-1">
+                  <span>Certificate:</span>
+                  {activeCourseCertificate ? (
+                    <Link
+                      to={`/certificates/${activeCourseCertificate.id}`}
+                      className="font-black text-[10px] px-2.5 py-1 rounded-xl bg-purple-600/15 text-purple-400 hover:bg-purple-600/25 border border-purple-500/20 transition cursor-pointer select-none"
+                    >
+                      View Certificate
+                    </Link>
+                  ) : isCourseComplete ? (
+                    <button
+                      onClick={handleGenerateCertificate}
+                      disabled={generateCertificateMut.isPending}
+                      className="font-black text-[10px] px-2.5 py-1 rounded-xl bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer flex items-center gap-1.5 focus:outline-none select-none"
+                    >
+                      {generateCertificateMut.isPending ? (
+                        <>
+                          <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        "Generate"
+                      )}
+                    </button>
+                  ) : (
+                    <span className="font-black text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-550 select-none">
+                      Locked
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -609,17 +843,70 @@ export default function CoursePlayer() {
         </div>
       </div>
 
-      {/* Confetti celebration dialog overlay */}
       <CompletionDialog
         isOpen={isCompletionDialogOpen}
         onClose={() => setIsCompletionDialogOpen(false)}
         courseTitle={structure.title}
-        hasQuiz={true}
+        hasQuiz={hasQuizLessons}
+        quizPassed={quizPassed}
+        certificateAvailable={true}
         onStartQuiz={() => {
           setActiveTab("quiz");
-          setQuizStarted(true);
+        }}
+        onViewCertificate={() => {
+          setIsCompletionDialogOpen(false);
+          navigate("/certificates");
         }}
       />
     </div>
+  );
+}
+
+function QuizIntroInline({
+  quizId,
+  onStart,
+  isLoading,
+  attemptHistory,
+  maxAttempts,
+  attemptsRemaining,
+}: {
+  quizId: string;
+  onStart: () => void;
+  isLoading: boolean;
+  attemptHistory: QuizAttemptMeta[];
+  maxAttempts: number;
+  attemptsRemaining: number;
+}) {
+  const { data: quiz, isLoading: isQuizLoading } = useQuizDetail(quizId);
+
+  if (isQuizLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center space-y-3">
+          <Spinner size="md" />
+          <p className="text-xs text-zinc-500 font-bold">Loading quiz details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!quiz) {
+    return (
+      <div className="max-w-xl p-6 bg-zinc-900 border border-zinc-800 rounded-3xl text-center">
+        <Info className="h-8 w-8 text-zinc-500 mx-auto mb-3" />
+        <p className="text-xs font-bold text-zinc-400">Quiz data unavailable</p>
+      </div>
+    );
+  }
+
+  return (
+    <QuizIntro
+      quiz={quiz}
+      onStart={onStart}
+      isLoading={isLoading}
+      attemptHistory={attemptHistory}
+      maxAttempts={maxAttempts}
+      attemptsRemaining={attemptsRemaining}
+    />
   );
 }

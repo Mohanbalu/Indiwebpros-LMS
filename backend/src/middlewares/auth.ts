@@ -20,12 +20,17 @@ declare global {
 
 export async function authGuard(req: Request, _res: Response, next: NextFunction): Promise<void> {
   try {
+    let token = "";
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      throw new UnauthorizedError("Authentication token is missing or malformed");
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.split(" ")[1];
+    } else if (req.query.token) {
+      token = req.query.token as string;
     }
 
-    const token = authHeader.split(" ")[1];
+    if (!token) {
+      throw new UnauthorizedError("Authentication token is missing or malformed");
+    }
     let decoded: TokenPayload;
 
     try {

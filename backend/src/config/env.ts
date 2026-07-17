@@ -16,10 +16,11 @@ const envSchema = z.object({
   AWS_BUCKET: z.string().min(1),
   AWS_ACCESS_KEY: z.string().min(1),
   AWS_SECRET_KEY: z.string().min(1),
-  SMTP_HOST: z.string().min(1),
+  EMAIL_PROVIDER: z.string().default(process.env.EMAIL_PROVIDER || "smtp"),
+  SMTP_HOST: z.string().default(process.env.SMTP_HOST || "localhost"),
   SMTP_PORT: z.coerce.number().default(587),
-  SMTP_USER: z.string().min(1),
-  SMTP_PASSWORD: z.string().min(1),
+  SMTP_USER: z.string().default(process.env.SMTP_USER || process.env.SMTP_USERNAME || "mock-user"),
+  SMTP_PASSWORD: z.string().default(process.env.SMTP_PASSWORD || "mock-pass"),
   FRONTEND_URL: z.string().url(),
   // Razorpay Payment Gateway
   RAZORPAY_KEY_ID: z.string().default("mock-rzp-key"),
@@ -34,6 +35,7 @@ const envSchema = z.object({
   npm_package_version: z.string().optional(),
   // Observability: protect /metrics in production
   INTERNAL_METRICS_KEY: z.string().optional(),
+  INTERNAL_EMAIL_HEALTH_KEY: z.string().optional(),
 });
 
 const result = envSchema.safeParse(process.env);

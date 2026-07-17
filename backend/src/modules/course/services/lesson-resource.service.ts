@@ -40,17 +40,13 @@ export class LessonResourceService {
       include: { file: true },
     });
 
-    ServiceContainer.logger.info(`Resource uploaded to lesson ${lessonId}: ${resource.id}`);
-    try {
-      await ServiceContainer.audit.log({
-        userId,
-        action: "RESOURCE_UPLOADED",
-        resource: "LessonResource",
-        resourceId: resource.id,
-        details: { lessonId, fileId: input.fileId },
-        status: "SUCCESS",
-      });
-    } catch { /* non-blocking */ }
+    if (resource.file && resource.file.key) {
+      try {
+        resource.file.url = await ServiceContainer.storage.getSignedDownloadUrl(resource.file.key, 3600);
+      } catch (err) {
+        // ignore
+      }
+    }
 
     return resource;
   }

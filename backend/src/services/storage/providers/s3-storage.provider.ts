@@ -168,6 +168,26 @@ export class S3StorageProvider implements IStorageService, ILifecycleService, IH
     }
   }
 
+  async getStream(path: string, range?: string): Promise<{ stream: any; contentType?: string; contentLength?: number; contentRange?: string; acceptRanges?: string }> {
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.config.bucket,
+        Key: path,
+        Range: range,
+      });
+      const response = await this.s3Client.send(command);
+      return {
+        stream: response.Body,
+        contentType: response.ContentType,
+        contentLength: response.ContentLength,
+        contentRange: response.ContentRange,
+        acceptRanges: response.AcceptRanges,
+      };
+    } catch (error) {
+      throw new StorageException(`S3 getStream failed for ${path}`, [error]);
+    }
+  }
+
   /**
    * Returns a CloudFront CDN URL for a given S3 key.
    * Falls back to a signed S3 URL if CLOUDFRONT_URL is not configured.

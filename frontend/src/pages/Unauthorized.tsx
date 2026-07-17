@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ShieldAlert, ArrowLeft } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Logo } from "@/components/common/Logo";
 import { ROUTES } from "@/config/routes.config";

@@ -1,13 +1,16 @@
 import { BrowserRouter } from "react-router-dom";
 import { Providers } from "@/providers";
 import { AppRoutes } from "@/routes";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
 export default function App() {
   return (
-    <Providers>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </Providers>
+    <ErrorBoundary>
+      <Providers>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </Providers>
+    </ErrorBoundary>
   );
 }

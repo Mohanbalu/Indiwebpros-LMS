@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from "express";
 import { coursePlayerService } from "../services/player.service";
 import { learningProgressService } from "../services/progress.service";
 import { ValidationError } from "@/errors/custom-errors";
+import { prisma } from "@/database/client";
+import { ServiceContainer } from "@/services/shared/service-container";
 import {
   videoProgressSchema,
   pdfProgressSchema,
@@ -165,5 +167,62 @@ export class CoursePlayerController {
       const result = await coursePlayerService.listNotes(userId, parsed.data);
       res.json({ success: true, ...result });
     } catch (e) { next(e); }
+  }
+
+  static async streamVideo(req: Request, res: Response, next: NextFunction) {
+    try {
+      const fetchDest = req.headers["sec-fetch-dest"];
+      if (fetchDest && fetchDest !== "video" && fetchDest !== "empty" && fetchDest !== "audio") {
+        res.status(403).send("Direct link access is forbidden.");
+        return;
+      }
+
+      const lessonId = req.params.lessonId as string;
+      const userId = req.user!.userId;
+      const role = req.user!.role;
+
+      const lesson = await prisma.lesson.findFirst({
+        where: { id: lessonId, deletedAt: null },
+        include: {
+          module: true,
+          video: true,
+        },
+      });
+
+      if (!lesson || !lesson.video) {
+        res.status(404).send("Video not found.");
+        return;
+      }
+
+      await learningProgressService.validateEnrollment(userId, lesson.module.courseId, role);
+
+      const range = req.headers.range;
+      const { stream, contentType, contentLength, contentRange, acceptRanges } = 
+        await (ServiceContainer.storage as any).getStream(lesson.video.key, range);
+
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+
+      if (contentType) res.setHeader("Content-Type", contentType);
+      if (acceptRanges) res.setHeader("Accept-Ranges", acceptRanges);
+      if (contentRange) res.setHeader("Content-Range", contentRange);
+      
+      if (range) {
+        res.status(206);
+      } else {
+        res.status(200);
+      }
+
+      if (contentLength !== undefined) {
+        res.setHeader("Content-Length", contentLength.toString());
+      }
+
+      if (stream && typeof stream.pipe === "function") {
+        stream.pipe(res);
+      } else {
+        res.status(500).send("Unable to stream video container.");
+      }
+    } catch (e) {
+      next(e);
+    }
   }
 }

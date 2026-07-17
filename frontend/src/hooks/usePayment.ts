@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { paymentService, VerifyPaymentPayload } from "@/services/payment.service";
+import { extractErrorMessage } from "@/types/api.types";
 
 export type PaymentState =
   | "idle"
@@ -18,40 +19,42 @@ export function usePayment() {
   const [errorMsg, setErrorMsg] = useState<string>("");
 
   const createOrderMutation = useMutation({
-    mutationFn: async ({ courseId, couponCode }: { courseId: string; couponCode?: string }) => {
+    mutationFn: ({ courseId, couponCode }: { courseId: string; couponCode?: string }) =>
+      paymentService.createRazorpayOrder(courseId, couponCode),
+    onMutate: () => {
       setPaymentState("creating_order");
       setErrorMsg("");
-      return paymentService.createRazorpayOrder(courseId, couponCode);
     },
-    onError: (err: any) => {
+    onError: (err) => {
       setPaymentState("payment_failed");
-      setErrorMsg(err.response?.data?.message || err.message || "Failed to create payment order");
+      setErrorMsg(extractErrorMessage(err, "Failed to create payment order"));
     },
   });
 
   const verifyPaymentMutation = useMutation({
-    mutationFn: async (payload: VerifyPaymentPayload) => {
+    mutationFn: (payload: VerifyPaymentPayload) =>
+      paymentService.verifyRazorpayPayment(payload),
+    onMutate: () => {
       setPaymentState("payment_processing");
-      return paymentService.verifyRazorpayPayment(payload);
     },
     onSuccess: () => {
       setPaymentState("payment_success");
-      // Invalidate queries to refresh enrollment states
       queryClient.invalidateQueries({ queryKey: ["enrollments"] });
       queryClient.invalidateQueries({ queryKey: ["my-courses"] });
       queryClient.invalidateQueries({ queryKey: ["courses"] });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       setPaymentState("verification_failed");
-      setErrorMsg(err.response?.data?.message || err.message || "Payment verification failed");
+      setErrorMsg(extractErrorMessage(err, "Payment verification failed"));
     },
   });
 
   const enrollFreeMutation = useMutation({
-    mutationFn: async ({ courseId, couponCode }: { courseId: string; couponCode?: string }) => {
+    mutationFn: ({ courseId, couponCode }: { courseId: string; couponCode?: string }) =>
+      paymentService.initializeFreeEnrollment(courseId, couponCode),
+    onMutate: () => {
       setPaymentState("payment_processing");
       setErrorMsg("");
-      return paymentService.initializeFreeEnrollment(courseId, couponCode);
     },
     onSuccess: () => {
       setPaymentState("payment_success");
@@ -59,9 +62,9 @@ export function usePayment() {
       queryClient.invalidateQueries({ queryKey: ["my-courses"] });
       queryClient.invalidateQueries({ queryKey: ["courses"] });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       setPaymentState("payment_failed");
-      setErrorMsg(err.response?.data?.message || err.message || "Direct enrollment failed");
+      setErrorMsg(extractErrorMessage(err, "Direct enrollment failed"));
     },
   });
 
@@ -69,7 +72,6 @@ export function usePayment() {
     paymentState,
     setPaymentState,
     errorMsg,
-    setErrorMsg,
     createOrder: createOrderMutation.mutateAsync,
     isCreatingOrder: createOrderMutation.isPending,
     verifyPayment: verifyPaymentMutation.mutateAsync,

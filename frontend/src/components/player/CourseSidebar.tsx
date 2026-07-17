@@ -58,28 +58,28 @@ export function CourseSidebar({
     .filter((m) => m.lessons.length > 0);
 
   return (
-    <div className="w-80 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex flex-col h-full select-none">
+    <div className="w-80 border-r border-zinc-800/80 bg-zinc-900 text-zinc-100 flex flex-col h-full select-none">
       {/* Sidebar Header Search */}
-      <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/10">
-        <h3 className="text-xs font-black uppercase text-zinc-400 dark:text-zinc-500 tracking-widest mb-3">
+      <div className="p-4 border-b border-zinc-800/80 bg-zinc-950/20">
+        <h3 className="text-xs font-black uppercase text-zinc-500 tracking-widest mb-3">
           Course Curriculum
         </h3>
         <div className="relative">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400 dark:text-zinc-500" />
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-550" />
           <input
             type="text"
             placeholder="Search lessons..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-950 text-zinc-850 dark:text-zinc-50 focus:outline-none transition"
+            className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-zinc-950 border border-zinc-800/60 focus:border-blue-500/80 text-zinc-200 focus:outline-none transition"
           />
         </div>
       </div>
 
       {/* Accordion Modules List */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1.5 scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-800">
+      <div className="flex-1 overflow-y-auto p-2 space-y-1.5 scrollbar-thin scrollbar-thumb-zinc-800">
         {filteredModules.length === 0 ? (
-          <div className="p-6 text-center text-xs text-zinc-450 dark:text-zinc-500">
+          <div className="p-6 text-center text-xs text-zinc-500">
             No lessons matched your search.
           </div>
         ) : (
@@ -90,31 +90,31 @@ export function CourseSidebar({
             return (
               <div
                 key={module.id}
-                className="border border-zinc-100 dark:border-zinc-900/50 rounded-2xl overflow-hidden"
+                className="border border-zinc-800/40 rounded-2xl overflow-hidden bg-zinc-950/10"
               >
                 {/* Module Trigger Header */}
                 <button
                   onClick={() => toggleModule(module.id)}
-                  className="w-full p-3.5 flex items-center justify-between text-left hover:bg-zinc-50 dark:hover:bg-zinc-900/40 bg-zinc-50/30 dark:bg-zinc-900/10 transition duration-200 focus:outline-none"
+                  className="w-full p-3.5 flex items-center justify-between text-left hover:bg-zinc-800/30 bg-zinc-950/20 transition duration-200 focus:outline-none"
                 >
                   <div className="flex-1 min-w-0 pr-2">
-                    <h4 className="text-xs font-bold text-zinc-850 dark:text-zinc-200 truncate">
+                    <h4 className="text-xs font-black text-zinc-200 truncate">
                       {module.title}
                     </h4>
-                    <span className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-550 block mt-0.5">
+                    <span className="text-[10px] font-bold text-zinc-500 block mt-0.5">
                       {completedCount} / {module.lessons.length} Lessons completed
                     </span>
                   </div>
                   {isExpanded ? (
-                    <ChevronDown className="h-4 w-4 text-zinc-400 flex-shrink-0" />
+                    <ChevronDown className="h-4 w-4 text-zinc-500 flex-shrink-0" />
                   ) : (
-                    <ChevronRight className="h-4 w-4 text-zinc-400 flex-shrink-0" />
+                    <ChevronRight className="h-4 w-4 text-zinc-500 flex-shrink-0" />
                   )}
                 </button>
 
                 {/* Module Lessons Items */}
                 {isExpanded && (
-                  <div className="bg-white dark:bg-zinc-950/20 divide-y divide-zinc-100/50 dark:divide-zinc-900/30">
+                  <div className="bg-zinc-950/10 divide-y divide-zinc-800/40">
                     {module.lessons.map((lesson) => {
                       const isLocked = !unlockedLessonIds.has(lesson.id);
                       const isActive = activeLessonId === lesson.id;
@@ -126,9 +126,9 @@ export function CourseSidebar({
                           onClick={() => onSelectLesson(lesson)}
                           className={`w-full p-3 flex items-start gap-3 text-left transition relative focus:outline-none lesson-item ${
                             isActive
-                              ? "bg-blue-50/50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border-l-2 border-blue-500 pl-2.5"
-                              : "hover:bg-zinc-50/50 dark:hover:bg-zinc-900/20 text-zinc-700 dark:text-zinc-400"
-                          } ${isLocked ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+                              ? "bg-blue-600/15 text-blue-400 border-l-2 border-blue-500 pl-2.5"
+                              : "hover:bg-zinc-800/10 text-zinc-400"
+                          } ${isLocked ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
                         >
                           <div className="mt-0.5 flex-shrink-0">
                             {getLessonIcon(lesson.lessonType, lesson.progress.completed, isLocked)}
@@ -138,7 +138,7 @@ export function CourseSidebar({
                               {lesson.title}
                             </span>
                             <div className="flex items-center gap-2 mt-1">
-                              <span className="text-[9px] text-zinc-400 dark:text-zinc-500 font-medium">
+                              <span className="text-[9px] text-zinc-550 font-bold">
                                 {Math.round(lesson.durationSeconds / 60)} mins
                               </span>
                               {lesson.progress.watchPercentage > 0 && !lesson.progress.completed && (

@@ -17,6 +17,7 @@ router.use(authGuard);
 router.get("/my", readRl, CertificateController.getMyCertificates);
 router.get("/:id", readRl, CertificateController.getCertificate);
 router.get("/:id/download", readRl, CertificateController.downloadCertificate);
+router.post("/generate-student", writeRl, CertificateController.generateStudentCertificate);
 
 // Admin-only endpoints
 router.post("/generate", adminGuard, writeRl, CertificateController.generateCertificate);

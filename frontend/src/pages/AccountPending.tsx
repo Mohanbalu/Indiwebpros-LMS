@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Clock, ShieldAlert, ArrowLeft } from "lucide-react";
+import { Clock } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Logo } from "@/components/common/Logo";
 import { ROUTES } from "@/config/routes.config";

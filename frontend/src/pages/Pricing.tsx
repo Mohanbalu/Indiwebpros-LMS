@@ -99,7 +99,7 @@ export default function Pricing() {
                 <Link to={ROUTES.register}>
                   <Button
                     className="w-full"
-                    variant={tier.popular ? "default" : "outline"}
+                    variant={tier.popular ? "primary" : "outline"}
                   >
                     {tier.cta}
                   </Button>

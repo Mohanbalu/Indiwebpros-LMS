@@ -10,6 +10,7 @@ import { prisma } from "@/database/client";
 import { env } from "@/config/env";
 import { ServiceContainer } from "@/services/shared/service-container";
 import { ServiceRegistry } from "@/services/shared/service-registry";
+import { EmailHealthReport } from "@/services/email";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,10 @@ export interface ReadinessReport {
   status: HealthStatus;
   timestamp: string;
   checks: { database: ServiceCheck; storage: ServiceCheck; email: ServiceCheck };
+}
+
+export interface EmailHealthEndpointReport extends EmailHealthReport {
+  timestamp: string;
 }
 
 export interface StartupReport {
@@ -176,6 +181,16 @@ export class HealthService {
     const start = Date.now();
     try {
       const email = ServiceContainer.email as unknown as Record<string, unknown>;
+      if (typeof email.getEmailHealth === "function") {
+        const report = await (email.getEmailHealth as () => Promise<EmailHealthReport>)();
+        return {
+          status: report.status === "healthy" ? "healthy" : "unhealthy",
+          latency: Date.now() - start,
+          message: report.status === "healthy" ? "Email provider reachable" : report.errorMessage ?? "Email provider health check failed",
+          details: this.summarizeEmailHealth(report),
+        };
+      }
+
       if (typeof email.health === "function") {
         const result = await (email.health as () => Promise<{ status: string; message: string }>)();
         return {
@@ -192,6 +207,27 @@ export class HealthService {
         message: (error as Error).message,
       };
     }
+  }
+
+  static async getEmailHealth(): Promise<EmailHealthEndpointReport> {
+    const email = ServiceContainer.email as unknown as Record<string, unknown>;
+    if (typeof email.getEmailHealth !== "function") {
+      throw new Error("Email provider does not expose detailed health information");
+    }
+
+    const report = await (email.getEmailHealth as () => Promise<EmailHealthReport>)();
+    return { ...report, timestamp: new Date().toISOString() };
+  }
+
+  private static summarizeEmailHealth(report: EmailHealthReport): Record<string, unknown> {
+    return {
+      provider: report.provider,
+      connectionStatus: report.connectionStatus,
+      authenticationStatus: report.authenticationStatus,
+      lastSuccessfulCheck: report.lastSuccessfulCheck,
+      errorMessage: report.errorMessage,
+      checkedAt: report.checkedAt,
+    };
   }
 
   // ── Registered Services Check ─────────────────────────────────────────────

@@ -3,11 +3,14 @@ import { Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Mail, CheckCircle, ArrowLeft, ShieldAlert } from "lucide-react";
+import { Mail, ArrowLeft, ShieldAlert, KeyRound, CheckCircle, ArrowRight } from "lucide-react";
+import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
+import { extractErrorMessage } from "@/types/api.types";
 import { Button } from "@/components/ui/Button";
-import { Logo } from "@/components/common/Logo";
 import { ROUTES } from "@/config/routes.config";
+import { AuthCard } from "@/components/auth/shared/AuthCard";
+import { AuthHeader } from "@/components/auth/shared/AuthHeader";
 
 const forgotPasswordSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -36,72 +39,132 @@ export default function ForgotPassword() {
       setErrorMsg("");
       await forgotPassword(data.email);
       setSuccess(true);
-    } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || "Failed to initiate password reset. Please try again.");
+    } catch (err) {
+      setErrorMsg(extractErrorMessage(err, "Failed to initiate password reset. Please try again."));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="w-full max-w-md mx-auto p-6 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200/50 dark:border-zinc-800/80 shadow-md">
-      <div className="flex flex-col items-center mb-6">
-        <Logo />
-        <h1 className="text-2xl font-extrabold text-zinc-900 dark:text-zinc-50 mt-4">Forgot Password</h1>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 text-center">
-          Enter your registered email below, and we'll send you a password reset link.
-        </p>
-      </div>
-
+    <AuthCard>
       {success ? (
-        <div className="text-center py-6">
-          <CheckCircle className="h-12 w-12 text-emerald-500 mx-auto mb-4" />
-          <h3 className="font-bold text-zinc-900 dark:text-zinc-50">Reset Link Sent</h3>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 leading-relaxed">
-            Check your inbox for instructions to reset your password. If you don't receive it in a few minutes, check your spam folder.
+        <motion.div
+          className="text-center"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+        >
+          <motion.div
+            className="inline-flex p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-2xl mb-6"
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 500, damping: 17, delay: 0.2 }}
+          >
+            <CheckCircle className="h-10 w-10 text-emerald-500" />
+          </motion.div>
+          <h1 className="text-2xl xl:text-3xl font-black text-zinc-950 dark:text-white tracking-tight">
+            Check your email
+          </h1>
+          <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400 font-medium leading-relaxed max-w-xs mx-auto">
+            We&apos;ve sent a password reset link to your email address. Please check your inbox and follow the instructions.
           </p>
-          <Link to={ROUTES.login}>
-            <Button className="mt-6 w-full">Back to Sign In</Button>
+          <Link to={ROUTES.login} className="block mt-8">
+            <Button className="w-full py-3.5 text-sm font-bold rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300">
+              <span className="flex items-center justify-center gap-2">
+                Back to Sign In
+                <ArrowRight className="h-4 w-4" />
+              </span>
+            </Button>
           </Link>
-        </div>
+        </motion.div>
       ) : (
         <>
+          <AuthHeader
+            showLogo={false}
+            illustration={
+              <motion.div
+                className="p-4 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg shadow-blue-500/30"
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: "spring", stiffness: 500, damping: 17, delay: 0.2 }}
+              >
+                <KeyRound className="h-8 w-8 text-white" />
+              </motion.div>
+            }
+            title="Forgot password?"
+            subtitle="Enter your email and we'll send you a reset link"
+          />
+
           {errorMsg && (
-            <div className="mb-4 p-4 rounded-xl bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-xs font-semibold flex gap-2">
+            <motion.div
+              className="mb-6 p-4 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/30 text-red-700 dark:text-red-400 text-sm font-semibold flex gap-3 items-center"
+              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.3 }}
+              role="alert"
+            >
               <ShieldAlert className="h-4 w-4 flex-shrink-0" />
               <span>{errorMsg}</span>
-            </div>
+            </motion.div>
           )}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-1">Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+            <div className="space-y-1.5">
+              <label htmlFor="fp-email" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                Email address
+              </label>
+              <div className="relative group">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 group-focus-within:text-blue-500 transition-colors duration-200" />
                 <input
+                  id="fp-email"
                   type="email"
                   {...register("email")}
-                  className="w-full pl-10 pr-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-zinc-900 dark:text-zinc-50"
+                  className="w-full pl-11 pr-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-zinc-900 dark:text-zinc-50 placeholder-zinc-400 dark:placeholder-zinc-500 transition-all duration-200"
                   placeholder="you@example.com"
+                  autoComplete="email"
+                  aria-invalid={!!errors.email}
+                  aria-describedby={errors.email ? "fp-email-error" : undefined}
                 />
               </div>
               {errors.email && (
-                <p className="mt-1 text-xs text-rose-500">{errors.email.message}</p>
+                <p id="fp-email-error" className="text-xs text-red-500 font-medium flex items-center gap-1.5 mt-1.5">
+                  <span className="w-1 h-1 bg-red-500 rounded-full flex-shrink-0" />
+                  {errors.email.message}
+                </p>
               )}
             </div>
 
-            <Button type="submit" disabled={loading} className="w-full font-semibold">
-              {loading ? "Sending..." : "Send Reset Link"}
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3.5 text-sm font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Sending reset link...
+                </span>
+              ) : (
+                "Send Reset Link"
+              )}
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            <Link to={ROUTES.login} className="inline-flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400 font-bold hover:underline">
-              <ArrowLeft className="h-3 w-3" /> Back to Sign In
+          <div className="mt-8 text-center">
+            <Link
+              to={ROUTES.login}
+              className="inline-flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400 font-semibold hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors duration-200"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Sign In
             </Link>
           </div>
         </>
       )}
-    </div>
+    </AuthCard>
   );
 }

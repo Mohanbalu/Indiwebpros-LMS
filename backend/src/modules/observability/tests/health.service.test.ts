@@ -3,6 +3,7 @@
  */
 
 import { HealthService } from "../services/health.service";
+import { ServiceContainer } from "../../../services/shared/service-container";
 
 let passed = 0;
 let failed = 0;
@@ -136,6 +137,45 @@ async function testStartup() {
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 
+async function testEmailHealthIntegration() {
+  console.log("\nEmail Health Integration");
+
+  process.env.NODE_ENV = "test";
+  ServiceContainer.clear();
+  ServiceContainer.unlock();
+  ServiceContainer.register("email", {
+    async getEmailHealth() {
+      return {
+        provider: "Brevo",
+        status: "healthy",
+        connectionStatus: "connected",
+        authenticationStatus: "authenticated",
+        lastSuccessfulCheck: "2026-07-16T00:00:00.000Z",
+        checkedAt: "2026-07-16T00:00:01.000Z",
+        latency: 7,
+        checks: {
+          dns: { status: "passed", latency: 1 },
+          tcp: { status: "passed", latency: 2 },
+          tls: { status: "passed", latency: 3 },
+          auth: { status: "passed", latency: 3 },
+        },
+        details: { host: "smtp.example.com", port: 587, secure: false },
+      };
+    },
+  });
+
+  const summary = await HealthService.checkEmail();
+  assert(summary.status === "healthy", "Aggregate email check reports healthy provider");
+  assert(summary.details?.provider === "Brevo", "Aggregate email check includes provider");
+  assert(summary.details?.connectionStatus === "connected", "Aggregate email check includes connection status");
+  assert(summary.details?.authenticationStatus === "authenticated", "Aggregate email check includes auth status");
+  assert(!JSON.stringify(summary).includes("smtp.example.com"), "Aggregate email summary omits SMTP host details");
+
+  const detailed = await HealthService.getEmailHealth();
+  assert(detailed.provider === "Brevo", "Detailed email health endpoint includes provider");
+  assert(detailed.details.host === "smtp.example.com", "Detailed email health includes non-secret host and port data");
+}
+
 async function run() {
   console.log("🏥 Health Service Tests\n" + "─".repeat(40));
 
@@ -145,6 +185,7 @@ async function run() {
   await testFullHealth();
   testStatusAggregation();
   await testStartup();
+  await testEmailHealthIntegration();
 
   console.log("\n" + "─".repeat(40));
   console.log(`📊 Health Tests: ${passed} passed, ${failed} failed`);

@@ -73,6 +73,13 @@ We implement four separate health probes tailored for orchestrators like Kuberne
 - **Objective**: Detailed infrastructure state review.
 - **Verification**: Aggregates all readiness + process health checks and list metadata of all registered services.
 
+### Email Health Probe (`GET /health/email`)
+- **Objective**: Provide an enterprise email-provider diagnostic without sending mail.
+- **Startup behavior**: Runs once during provider initialization and records the latest successful check.
+- **Verification**: DNS resolution, TCP connection to the SMTP host, TLS negotiation, and SMTP authentication via Nodemailer's non-sending verification flow.
+- **Security**: The detailed endpoint requires an Admin bearer token or an internal `x-internal-key` matching `INTERNAL_EMAIL_HEALTH_KEY`/`INTERNAL_METRICS_KEY`. Public aggregate health only receives a sanitized summary. SMTP credentials are never returned.
+- **Response fields**: provider, connection status, authentication status, last successful check timestamp, sanitized error message, per-step status, host, port, and secure mode.
+
 ---
 
 ## 3. Structured JSON Logging

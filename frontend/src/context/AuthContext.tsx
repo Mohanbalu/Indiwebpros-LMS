@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { api } from "@/services/api";
+import type { RegisterPayload, ResetPasswordPayload } from "@/types/auth.types";
 
 interface UserProfile {
   id: string;
@@ -14,12 +15,12 @@ interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<UserProfile>;
-  register: (payload: any) => Promise<any>;
+  register: (payload: RegisterPayload) => Promise<unknown>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   resendVerification: (email: string) => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
-  resetPassword: (payload: any) => Promise<void>;
+  resetPassword: (payload: ResetPasswordPayload) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
       }
     } catch (err) {
+      localStorage.removeItem("token");
       setUser(null);
     } finally {
       setLoading(false);
@@ -78,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     throw new Error(res?.data?.message || "Invalid credentials received");
   };
 
-  const register = async (payload: any) => {
+  const register = async (payload: RegisterPayload) => {
     const res = await api.post("/auth/register", payload);
     return res.data;
   };
@@ -100,7 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await api.post("/auth/forgot-password", { email });
   };
 
-  const resetPassword = async (payload: any) => {
+  const resetPassword = async (payload: ResetPasswordPayload) => {
     await api.post("/auth/reset-password", payload);
   };
 

@@ -1,5 +1,5 @@
 import React from "react";
-import { Award, Sparkles, X, ChevronRight } from "lucide-react";
+import { Award, Sparkles, X, ChevronRight, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 interface CompletionDialogProps {
@@ -7,7 +7,10 @@ interface CompletionDialogProps {
   onClose: () => void;
   courseTitle: string;
   onStartQuiz?: () => void;
+  onViewCertificate?: () => void;
+  certificateAvailable?: boolean;
   hasQuiz: boolean;
+  quizPassed?: boolean;
 }
 
 export function CompletionDialog({
@@ -15,14 +18,19 @@ export function CompletionDialog({
   onClose,
   courseTitle,
   onStartQuiz,
+  onViewCertificate,
+  certificateAvailable = false,
   hasQuiz,
+  quizPassed = false,
 }: CompletionDialogProps) {
   if (!isOpen) return null;
+
+  const showCertificate = certificateAvailable && quizPassed;
+  const showQuiz = hasQuiz && !quizPassed;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <div className="relative w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 text-center shadow-2xl animate-scale-up">
-        {/* Close Button */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 dark:text-zinc-550 transition"
@@ -30,7 +38,6 @@ export function CompletionDialog({
           <X className="h-4 w-4" />
         </button>
 
-        {/* Sparkles / Celebration Icons */}
         <div className="relative flex justify-center mb-6">
           <div className="absolute -top-3 -left-3 animate-ping">
             <Sparkles className="h-6 w-6 text-amber-400 fill-amber-400/20" />
@@ -53,22 +60,47 @@ export function CompletionDialog({
           </span>
         </p>
 
-        {/* Action Controls */}
         <div className="space-y-3">
-          {hasQuiz ? (
+          {showQuiz ? (
             <Button
               onClick={() => {
                 onClose();
                 onStartQuiz?.();
               }}
-              className="w-full flex items-center justify-center gap-1.5"
+              className="w-full flex items-center justify-center gap-1.5 generate-certificate-btn"
               size="lg"
             >
               Take Final Assessment <ChevronRight className="h-4 w-4" />
             </Button>
+          ) : showCertificate ? (
+            <Button
+              onClick={() => {
+                onClose();
+                onViewCertificate?.();
+              }}
+              className="w-full flex items-center justify-center gap-1.5 certificate-download-link"
+              size="lg"
+            >
+              <ExternalLink className="h-4 w-4" />
+              View Certificate
+            </Button>
           ) : (
             <Button onClick={onClose} className="w-full" size="lg">
-              Close & View Certificate
+              Continue Learning
+            </Button>
+          )}
+
+          {!showCertificate && quizPassed && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                onClose();
+                onViewCertificate?.();
+              }}
+              className="w-full"
+            >
+              Check Certificates
             </Button>
           )}
         </div>

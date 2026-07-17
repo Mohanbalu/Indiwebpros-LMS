@@ -1,13 +1,16 @@
-import { useState, useEffect } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Eye, EyeOff, Lock, CheckCircle, ShieldAlert } from "lucide-react";
+import { Eye, EyeOff, Lock, ShieldAlert, CheckCircle, ArrowRight } from "lucide-react";
+import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
-import { Logo } from "@/components/common/Logo";
 import { ROUTES } from "@/config/routes.config";
+import { AuthCard } from "@/components/auth/shared/AuthCard";
+import { AuthHeader } from "@/components/auth/shared/AuthHeader";
+import { PasswordChecklist } from "@/components/auth/shared/PasswordChecklist";
 
 const passwordSchema = z
   .string()
@@ -32,7 +35,6 @@ type ResetPasswordFormInput = z.infer<typeof resetPasswordFormSchema>;
 export default function ResetPassword() {
   const { resetPassword } = useAuth();
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -53,35 +55,6 @@ export default function ResetPassword() {
   });
 
   const passwordVal = watch("password") || "";
-
-  // Live password strength calculation
-  const [passwordStrength, setPasswordStrength] = useState({
-    score: 0,
-    label: "Too Weak",
-    color: "bg-red-500",
-  });
-
-  useEffect(() => {
-    let score = 0;
-    if (passwordVal.length >= 8) score += 1;
-    if (/[a-z]/.test(passwordVal)) score += 1;
-    if (/[A-Z]/.test(passwordVal)) score += 1;
-    if (/[0-9]/.test(passwordVal)) score += 1;
-    if (/[^a-zA-Z0-9]/.test(passwordVal)) score += 1;
-
-    let label = "Too Weak";
-    let color = "bg-red-500";
-
-    if (score === 5) {
-      label = "Strong Choice!";
-      color = "bg-emerald-500";
-    } else if (score >= 3) {
-      label = "Good";
-      color = "bg-yellow-500";
-    }
-
-    setPasswordStrength({ score, label, color });
-  }, [passwordVal]);
 
   const onSubmit = async (data: ResetPasswordFormInput) => {
     if (!token) {
@@ -108,114 +81,160 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="w-full max-w-md mx-auto p-6 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200/50 dark:border-zinc-800/80 shadow-md">
-      <div className="flex flex-col items-center mb-6">
-        <Logo />
-        <h1 className="text-2xl font-extrabold text-zinc-900 dark:text-zinc-50 mt-4">Reset Password</h1>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-          Enter and confirm your new secure account password.
-        </p>
-      </div>
-
+    <AuthCard>
       {success ? (
-        <div className="text-center py-6">
-          <CheckCircle className="h-12 w-12 text-emerald-500 mx-auto mb-4" />
-          <h3 className="font-bold text-zinc-900 dark:text-zinc-50">Password Updated</h3>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 leading-relaxed">
-            Your account password has been successfully updated. You can now sign in using your new credentials.
+        <motion.div
+          className="text-center"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+        >
+          <motion.div
+            className="inline-flex p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-2xl mb-6"
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 500, damping: 17, delay: 0.2 }}
+          >
+            <CheckCircle className="h-10 w-10 text-emerald-500" />
+          </motion.div>
+          <h1 className="text-2xl xl:text-3xl font-black text-zinc-950 dark:text-white tracking-tight">
+            Password updated
+          </h1>
+          <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400 font-medium leading-relaxed max-w-xs mx-auto">
+            Your password has been successfully reset. You can now sign in with your new credentials.
           </p>
-          <Link to={ROUTES.login}>
-            <Button className="mt-6 w-full">Sign In</Button>
+          <Link to={ROUTES.login} className="block mt-8">
+            <Button className="w-full py-3.5 text-sm font-bold rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300">
+              <span className="flex items-center justify-center gap-2">
+                Sign In
+                <ArrowRight className="h-4 w-4" />
+              </span>
+            </Button>
           </Link>
-        </div>
+        </motion.div>
       ) : (
         <>
+          <AuthHeader
+            showLogo={false}
+            illustration={
+              <motion.div
+                className="p-4 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg shadow-blue-500/30"
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: "spring", stiffness: 500, damping: 17, delay: 0.2 }}
+              >
+                <Lock className="h-8 w-8 text-white" />
+              </motion.div>
+            }
+            title="Reset password"
+            subtitle="Create a new secure password for your account"
+          />
+
           {errorMsg && (
-            <div className="mb-4 p-4 rounded-xl bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-xs font-semibold flex gap-2">
+            <motion.div
+              className="mb-6 p-4 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/30 text-red-700 dark:text-red-400 text-sm font-semibold flex gap-3 items-center"
+              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.3 }}
+              role="alert"
+            >
               <ShieldAlert className="h-4 w-4 flex-shrink-0" />
               <span>{errorMsg}</span>
-            </div>
+            </motion.div>
           )}
 
           {!token && (
-            <div className="mb-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 text-xs font-semibold flex gap-2">
+            <motion.div
+              className="mb-6 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/30 text-amber-700 dark:text-amber-400 text-sm font-semibold flex gap-3 items-center"
+              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.3 }}
+              role="alert"
+            >
               <ShieldAlert className="h-4 w-4 flex-shrink-0" />
-              <span>Warning: No reset token detected in URL parameter. Link is invalid.</span>
-            </div>
+              <span>No reset token detected in URL. The link may be invalid.</span>
+            </motion.div>
           )}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-1">New Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+            <div className="space-y-1.5">
+              <label htmlFor="rp-password" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                New password
+              </label>
+              <div className="relative group">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 group-focus-within:text-blue-500 transition-colors duration-200" />
                 <input
+                  id="rp-password"
                   type={showPassword ? "text" : "password"}
                   {...register("password")}
-                  className="w-full pl-10 pr-10 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-zinc-900 dark:text-zinc-50"
-                  placeholder="••••••••"
+                  className="w-full pl-11 pr-12 py-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-zinc-900 dark:text-zinc-50 placeholder-zinc-400 dark:placeholder-zinc-500 transition-all duration-200"
+                  placeholder="Create a new password"
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 focus:outline-none"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 focus:outline-none transition-colors duration-200 p-1"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-
-              {/* Live strength meter */}
-              {passwordVal.length > 0 && (
-                <div className="mt-2 space-y-1">
-                  <div className="flex justify-between items-center text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
-                    <span>Password Strength</span>
-                    <span className={passwordStrength.score >= 3 ? "text-emerald-500" : "text-red-500"}>
-                      {passwordStrength.label}
-                    </span>
-                  </div>
-                  <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800 rounded overflow-hidden">
-                    <div
-                      className={`h-full ${passwordStrength.color} transition-all duration-300`}
-                      style={{ width: `${(passwordStrength.score / 5) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {errors.password && (
-                <p className="mt-1 text-xs text-rose-500">{errors.password.message}</p>
-              )}
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-1">Confirm New Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+            <div className="space-y-1.5">
+              <label htmlFor="rp-confirm" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                Confirm new password
+              </label>
+              <div className="relative group">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 group-focus-within:text-blue-500 transition-colors duration-200" />
                 <input
+                  id="rp-confirm"
                   type={showConfirmPassword ? "text" : "password"}
                   {...register("confirmPassword")}
-                  className="w-full pl-10 pr-10 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-zinc-900 dark:text-zinc-50"
-                  placeholder="••••••••"
+                  className="w-full pl-11 pr-12 py-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-zinc-900 dark:text-zinc-50 placeholder-zinc-400 dark:placeholder-zinc-500 transition-all duration-200"
+                  placeholder="Confirm your new password"
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 focus:outline-none"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 focus:outline-none transition-colors duration-200 p-1"
+                  aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
                 >
                   {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
               {errors.confirmPassword && (
-                <p className="mt-1 text-xs text-rose-500">{errors.confirmPassword.message}</p>
+                <p className="text-xs text-red-500 font-medium flex items-center gap-1.5 mt-1.5">
+                  <span className="w-1 h-1 bg-red-500 rounded-full flex-shrink-0" />
+                  {errors.confirmPassword.message}
+                </p>
               )}
             </div>
 
-            <Button type="submit" disabled={loading || !token} className="w-full font-semibold">
-              {loading ? "Updating..." : "Update Password"}
+            <PasswordChecklist password={passwordVal} />
+
+            <Button
+              type="submit"
+              disabled={loading || !token}
+              className="w-full py-3.5 text-sm font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Updating password...
+                </span>
+              ) : (
+                "Update Password"
+              )}
             </Button>
           </form>
         </>
       )}
-    </div>
+    </AuthCard>
   );
 }

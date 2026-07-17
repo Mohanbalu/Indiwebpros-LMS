@@ -1,6 +1,15 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Play, Pause, Volume2, VolumeX, Maximize2, ShieldAlert, RotateCcw } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { Play, Pause, Volume2, VolumeX, Maximize2, ShieldAlert, RotateCcw, RotateCw, Settings } from "lucide-react";
+
+const getBaseUrl = (url: string) => {
+  if (!url) return "";
+  try {
+    const urlObj = new URL(url);
+    return `${urlObj.origin}${urlObj.pathname}`;
+  } catch (e) {
+    return url.split("?")[0];
+  }
+};
 
 interface VideoPlayerPanelProps {
   videoUrl: string;
@@ -16,25 +25,58 @@ export function VideoPlayerPanel({
   onTimeUpdate,
 }: VideoPlayerPanelProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const baseVideoUrl = getBaseUrl(videoUrl);
+  
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const [showCenterIcon, setShowCenterIcon] = useState<"play" | "pause" | "skip-forward" | "skip-backward" | null>(null);
+  
   const lastLoggedRef = useRef<number>(0);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Reset state on URL change
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
+    setPlaybackSpeed(1);
     lastLoggedRef.current = 0;
-  }, [videoUrl]);
+  }, [baseVideoUrl]);
 
-  // Set initial seek position when video metadata loads
+  // Handle controls visibility timeout
+  const handleMouseMove = () => {
+    setShowControls(true);
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    if (isPlaying) {
+      controlsTimeoutRef.current = setTimeout(() => {
+        setShowControls(false);
+        setShowSpeedMenu(false);
+      }, 2500);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    };
+  }, [isPlaying]);
+
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
-      setDuration(videoRef.current.duration);
+      const d = videoRef.current.duration;
+      if (d && !isNaN(d) && d !== Infinity) {
+        setDuration(d);
+      }
+      videoRef.current.playbackRate = playbackSpeed;
       if (initialPosition > 0 && initialPosition < videoRef.current.duration) {
         videoRef.current.currentTime = initialPosition;
         setCurrentTime(initialPosition);
@@ -47,10 +89,17 @@ export function VideoPlayerPanel({
     if (isPlaying) {
       videoRef.current.pause();
       setIsPlaying(false);
+      triggerCenterAnimation("pause");
     } else {
       videoRef.current.play().catch(() => {});
       setIsPlaying(true);
+      triggerCenterAnimation("play");
     }
+  };
+
+  const triggerCenterAnimation = (type: "play" | "pause" | "skip-forward" | "skip-backward") => {
+    setShowCenterIcon(type);
+    setTimeout(() => setShowCenterIcon(null), 500);
   };
 
   const handleTimeUpdate = () => {
@@ -59,17 +108,23 @@ export function VideoPlayerPanel({
     setCurrentTime(current);
     onTimeUpdate?.(current);
 
+    // Dynamic duration backup update
+    const d = videoRef.current.duration;
+    if (d && !isNaN(d) && d !== Infinity && d !== duration) {
+      setDuration(d);
+    }
+
     // Save/sync progress every 5 seconds to reduce API load
     if (Math.abs(current - lastLoggedRef.current) >= 5) {
       lastLoggedRef.current = current;
-      onProgress(Math.floor(current), Math.floor(duration));
+      onProgress(Math.floor(current), Math.floor(d || duration));
     }
   };
 
   const handleEnded = () => {
     setIsPlaying(false);
-    // Mark as completed immediately at the end of the video
-    onProgress(Math.floor(duration), Math.floor(duration));
+    const d = videoRef.current?.duration || duration;
+    onProgress(Math.floor(d), Math.floor(d));
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,10 +149,59 @@ export function VideoPlayerPanel({
   };
 
   const handleFullscreen = () => {
-    if (!videoRef.current) return;
-    if (videoRef.current.requestFullscreen) {
-      videoRef.current.requestFullscreen();
+    if (!containerRef.current) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      containerRef.current.requestFullscreen().catch(() => {});
     }
+  };
+
+  const handleSpeedChange = (rate: number) => {
+    console.log("Setting playbackRate to:", rate);
+    if (videoRef.current) {
+      videoRef.current.playbackRate = rate;
+      setPlaybackSpeed(rate);
+    }
+    setShowSpeedMenu(false);
+  };
+
+  const handleRateChange = () => {
+    if (videoRef.current) {
+      console.log("onRateChange fired. Current rate in video tag:", videoRef.current.playbackRate, "Target:", playbackSpeed);
+      if (videoRef.current.playbackRate !== playbackSpeed) {
+        videoRef.current.playbackRate = playbackSpeed;
+      }
+    }
+  };
+
+  // Keep playback speed in sync with state
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = playbackSpeed;
+    }
+  }, [playbackSpeed, baseVideoUrl]);
+
+  // Fail-safe interval checks to force playbackRate even if browser overrides it
+  useEffect(() => {
+    if (!isPlaying) return;
+    const interval = setInterval(() => {
+      if (videoRef.current && videoRef.current.playbackRate !== playbackSpeed) {
+        console.log(`Interval Syncer: Restoring playback rate from ${videoRef.current.playbackRate} to ${playbackSpeed}`);
+        videoRef.current.playbackRate = playbackSpeed;
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [playbackSpeed, isPlaying]);
+
+  const skipTime = (secs: number) => {
+    if (!videoRef.current) return;
+    let newTime = videoRef.current.currentTime + secs;
+    if (newTime < 0) newTime = 0;
+    if (newTime > duration) newTime = duration;
+    videoRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
+    triggerCenterAnimation(secs > 0 ? "skip-forward" : "skip-backward");
   };
 
   const formatTime = (seconds: number) => {
@@ -106,10 +210,49 @@ export function VideoPlayerPanel({
     return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
+  // Keyboard shortcut listeners
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (["INPUT", "TEXTAREA"].includes((e.target as HTMLElement).tagName)) return;
+
+      switch (e.key.toLowerCase()) {
+        case " ":
+          e.preventDefault();
+          togglePlay();
+          break;
+        case "arrowleft":
+          e.preventDefault();
+          skipTime(-10);
+          break;
+        case "arrowright":
+          e.preventDefault();
+          skipTime(10);
+          break;
+        case "f":
+          e.preventDefault();
+          handleFullscreen();
+          break;
+        case "m":
+          e.preventDefault();
+          toggleMute();
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isPlaying, duration, isMuted, volume]);
+
   return (
-    <div className="relative group bg-black rounded-3xl border border-zinc-200 dark:border-zinc-800/80 overflow-hidden aspect-video shadow-lg max-w-4xl mx-auto flex flex-col justify-end">
+    <div 
+      ref={containerRef}
+      onMouseMove={handleMouseMove}
+      onContextMenu={(e) => e.preventDefault()}
+      className="relative group bg-black rounded-3xl border border-zinc-800/80 overflow-hidden aspect-video shadow-[0_20px_50px_rgba(0,0,0,0.5)] max-w-4xl mx-auto flex flex-col justify-end select-none"
+    >
       {videoUrl ? (
         <>
+          {/* Native HTML5 Video Element (Controls completely hidden to prevent dual overlays) */}
           <video
             ref={videoRef}
             src={videoUrl}
@@ -119,43 +262,92 @@ export function VideoPlayerPanel({
             onLoadedMetadata={handleLoadedMetadata}
             onEnded={handleEnded}
             onClick={togglePlay}
-            className="w-full h-full object-contain cursor-pointer play-video-btn"
+            onRateChange={handleRateChange}
+            onDurationChange={() => {
+              if (videoRef.current) {
+                const d = videoRef.current.duration;
+                if (d && !isNaN(d) && d !== Infinity) setDuration(d);
+              }
+            }}
+            controls={false}
+            playsInline
+            preload="auto"
+            disablePictureInPicture
+            controlsList="nodownload"
+            className="w-full h-full object-contain cursor-pointer"
           />
 
+          {/* Fading Play/Pause Center Indicator */}
+          {showCenterIcon && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <div className="p-5 rounded-full bg-black/60 backdrop-blur-sm border border-zinc-800/40 text-blue-400 animate-ping duration-300">
+                {showCenterIcon === "play" && <Play className="h-10 w-10 fill-current" />}
+                {showCenterIcon === "pause" && <Pause className="h-10 w-10 fill-current" />}
+                {showCenterIcon === "skip-forward" && <RotateCw className="h-10 w-10" />}
+                {showCenterIcon === "skip-backward" && <RotateCcw className="h-10 w-10" />}
+              </div>
+            </div>
+          )}
+
           {/* Premium Video Controls Bar */}
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col gap-3">
+          <div 
+            className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-6 flex flex-col gap-4 transition-all duration-300 transform z-20 ${
+              showControls ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
+            }`}
+          >
             {/* Timeline Progress Slider */}
             <div className="flex items-center gap-3">
-              <span className="text-[10px] font-bold text-white/90">
+              <span className="text-[10px] font-black tracking-widest text-zinc-350 min-w-[32px] text-right">
                 {formatTime(currentTime)}
               </span>
-              <input
-                type="range"
-                min={0}
-                max={duration || 100}
-                value={currentTime}
-                onChange={handleSeek}
-                className="flex-1 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-blue-500"
-              />
-              <span className="text-[10px] font-bold text-white/90">
+              <div className="relative flex-1 group/slider flex items-center h-4 cursor-pointer">
+                <input
+                  type="range"
+                  min={0}
+                  max={duration || 100}
+                  value={currentTime}
+                  onChange={handleSeek}
+                  className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:h-1.5 transition-all outline-none"
+                />
+              </div>
+              <span className="text-[10px] font-black tracking-widest text-zinc-350 min-w-[32px]">
                 {formatTime(duration)}
               </span>
             </div>
 
-            {/* Buttons Row */}
+            {/* Buttons & Controls Row */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+              {/* Playback Controls */}
+              <div className="flex items-center gap-5">
+                <button
+                  onClick={() => skipTime(-10)}
+                  className="text-zinc-400 hover:text-white transition focus:outline-none"
+                  title="Rewind 10s (Left Arrow)"
+                >
+                  <RotateCcw className="h-4.5 w-4.5" />
+                </button>
+
                 <button
                   onClick={togglePlay}
-                  className="text-white hover:text-blue-400 transition focus:outline-none play-video-btn"
+                  className="p-2.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-none"
+                  title={isPlaying ? "Pause (Space)" : "Play (Space)"}
                 >
                   {isPlaying ? <Pause className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 fill-current" />}
                 </button>
 
-                <div className="flex items-center gap-2 group/volume">
+                <button
+                  onClick={() => skipTime(10)}
+                  className="text-zinc-400 hover:text-white transition focus:outline-none"
+                  title="Forward 10s (Right Arrow)"
+                >
+                  <RotateCw className="h-4.5 w-4.5" />
+                </button>
+
+                {/* Volume bar with expanded slider */}
+                <div className="flex items-center gap-2 group/volume ml-2">
                   <button
                     onClick={toggleMute}
-                    className="text-white hover:text-blue-400 transition focus:outline-none"
+                    className="text-zinc-400 hover:text-white transition focus:outline-none"
                   >
                     {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                   </button>
@@ -166,27 +358,62 @@ export function VideoPlayerPanel({
                     step={0.05}
                     value={isMuted ? 0 : volume}
                     onChange={handleVolumeChange}
-                    className="w-16 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-blue-500 opacity-0 group-hover/volume:opacity-100 transition-opacity"
+                    className="w-0 opacity-0 group-hover/volume:w-16 group-hover/volume:opacity-100 transition-all duration-300 h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-500 outline-none"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center gap-4">
+              {/* Utility Settings & Fullscreen Controls */}
+              <div className="flex items-center gap-5 relative">
+                {/* Playback Rate Speed Selector */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowSpeedMenu(!showSpeedMenu)}
+                    className="flex items-center gap-1 text-[11px] font-black tracking-wider text-zinc-400 hover:text-white focus:outline-none bg-zinc-950/40 border border-zinc-800/80 px-2.5 py-1 rounded-xl transition"
+                    title="Playback speed"
+                  >
+                    <Settings className="h-3.5 w-3.5" />
+                    <span>{playbackSpeed === 1 ? "Normal" : `${playbackSpeed}x`}</span>
+                  </button>
+
+                  {/* Playback Speed Menu */}
+                  {showSpeedMenu && (
+                    <div className="absolute bottom-10 right-0 w-24 bg-zinc-950/95 backdrop-blur-md border border-zinc-800/80 rounded-2xl p-1.5 shadow-2xl flex flex-col gap-1 z-30 animate-fade-in max-h-48 overflow-y-auto">
+                      {[0.5, 1, 1.25, 1.5, 2].map((rate) => (
+                        <button
+                          key={rate}
+                          onClick={() => handleSpeedChange(rate)}
+                          className={`w-full py-1 text-[10px] font-extrabold rounded-lg text-center transition ${
+                            playbackSpeed === rate
+                              ? "bg-blue-600/20 text-blue-400"
+                              : "text-zinc-400 hover:bg-zinc-800/30 hover:text-white"
+                          }`}
+                        >
+                          {rate === 1 ? "Normal" : `${rate}x`}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <button
                   onClick={handleFullscreen}
-                  className="text-white hover:text-blue-400 transition focus:outline-none"
+                  className="text-zinc-400 hover:text-white transition focus:outline-none"
+                  title="Fullscreen (F)"
                 >
-                  <Maximize2 className="h-4 w-4" />
+                  <Maximize2 className="h-4.5 w-4.5" />
                 </button>
               </div>
             </div>
           </div>
         </>
       ) : (
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-zinc-400 bg-zinc-900">
-          <ShieldAlert className="h-10 w-10 text-zinc-550 mb-3 animate-pulse" />
-          <p className="text-xs font-bold">Failed to load video file</p>
-          <p className="text-[10px] text-zinc-500 mt-1">The signed resource URL is missing or has expired.</p>
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-zinc-500 bg-zinc-950">
+          <ShieldAlert className="h-12 w-12 text-zinc-700 mb-3 animate-pulse" />
+          <p className="text-xs font-black uppercase text-zinc-400 tracking-wider">Failed to Load Video Asset</p>
+          <p className="text-[10px] text-zinc-650 mt-1 max-w-xs leading-relaxed">
+            The S3 file container link is missing, expired, or unauthorized. Please re-sign configurations.
+          </p>
         </div>
       )}
     </div>

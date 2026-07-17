@@ -2,6 +2,7 @@ import { ReactNode, StrictMode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider as NextThemeProvider } from "next-themes";
 import { THEME_CONFIG } from "@/config/theme.config";
+import { QUERY_CONFIG } from "@/config/query.config";
 import { AuthProvider } from "@/context/AuthContext";
 
 interface ProvidersProps {
@@ -9,13 +10,7 @@ interface ProvidersProps {
 }
 
 const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-      staleTime: 5 * 60 * 1000,
-    },
-  },
+  defaultOptions: QUERY_CONFIG,
 });
 
 export function Providers({ children }: ProvidersProps) {

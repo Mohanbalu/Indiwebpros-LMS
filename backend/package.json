@@ -22,7 +22,8 @@
     "test:instructor": "tsx src/modules/dashboard/tests/instructor-run-tests.ts",
     "test:mentor": "tsx src/modules/dashboard/tests/mentor-run-tests.ts",
     "test:admin": "tsx src/modules/dashboard/tests/admin-run-tests.ts",
-    "test:razorpay": "tsx src/modules/enrollment/tests/payment-razorpay-run-tests.ts"
+    "test:razorpay": "tsx src/modules/enrollment/tests/payment-razorpay-run-tests.ts",
+    "test:observability": "tsx src/modules/observability/tests/run-all.ts"
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "^3.1086.0",
