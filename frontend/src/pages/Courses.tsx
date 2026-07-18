@@ -397,9 +397,10 @@ export default function Courses() {
             ) : (
               <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
                 {filteredCourses.map((course) => (
-                  <div
+                  <Link
                     key={course.id}
-                    className="course-card group relative flex flex-col justify-between overflow-hidden rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/80 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
+                    to={`/courses/${course.slug}`}
+                    className="course-card group relative flex flex-col justify-between overflow-hidden rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/80 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md cursor-pointer text-inherit no-underline"
                   >
                     <div className="p-6">
                       <div className="flex items-center justify-between mb-4">
@@ -412,10 +413,10 @@ export default function Courses() {
                       </div>
 
                       <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
-                        <Link to={`/courses/${course.slug}`}>{course.title}</Link>
+                        {course.title}
                       </h3>
 
-                      <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400 line-clamp-3 leading-relaxed">
+                      <p className="mt-2 text-sm text-zinc-550 dark:text-zinc-400 line-clamp-3 leading-relaxed">
                         {course.description}
                       </p>
 
@@ -436,13 +437,11 @@ export default function Courses() {
                       <span className="text-lg font-black text-zinc-900 dark:text-zinc-50">
                         {course.price === 0 ? "Free" : `$${course.price}`}
                       </span>
-                      <Link to={`/courses/${course.slug}`}>
-                        <Button size="sm" variant="ghost" className="group-hover:translate-x-1 transition-transform duration-200">
-                          View Details <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                        </Button>
-                      </Link>
+                      <span className="inline-flex items-center justify-center font-bold text-xs text-zinc-700 hover:text-blue-600 dark:text-zinc-300 dark:hover:text-blue-400 gap-1 group-hover:translate-x-1 transition-all duration-200">
+                        View Details <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                      </span>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}
