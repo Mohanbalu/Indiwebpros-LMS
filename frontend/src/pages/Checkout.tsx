@@ -216,21 +216,21 @@ export default function Checkout() {
         <div className="space-y-3 text-xs border-b border-zinc-200/50 dark:border-zinc-800/80 pb-6 mb-6">
           <div className="flex justify-between text-zinc-500">
             <span>Course Access Fee</span>
-            <span className="font-semibold">${basePrice}</span>
+            <span className="font-semibold">₹{basePrice}</span>
           </div>
           <div className="flex justify-between text-zinc-500">
             <span>Tax (GST)</span>
-            <span className="font-semibold">$0.00</span>
+            <span className="font-semibold">₹0.00</span>
           </div>
           <div className="flex justify-between text-zinc-500">
             <span>Platform Discount</span>
-            <span className="font-semibold text-green-600">-$0.00</span>
+            <span className="font-semibold text-green-600">-₹0.00</span>
           </div>
         </div>
 
         <div className="flex justify-between text-sm font-bold mb-8 text-zinc-900 dark:text-zinc-50">
           <span>Order Total</span>
-          <span className="text-lg font-black">${finalPrice}</span>
+          <span className="text-lg font-black">₹{finalPrice}</span>
         </div>
 
         {/* Error Display */}

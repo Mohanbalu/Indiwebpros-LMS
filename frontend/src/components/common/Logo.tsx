@@ -15,7 +15,7 @@ export function Logo({ className = "", showText = true, size = 32 }: LogoProps) 
         src={logoImg} 
         alt="Logo" 
         style={{ height: `${size}px`, width: `${size}px` }}
-        className="object-contain transition-transform group-hover:scale-110" 
+        className="object-contain transition-transform group-hover:scale-110 rounded-lg border border-zinc-200/50 dark:border-zinc-850/50" 
       />
       {showText && (
         <span className="font-bold text-lg tracking-tight text-zinc-900 dark:text-zinc-50">

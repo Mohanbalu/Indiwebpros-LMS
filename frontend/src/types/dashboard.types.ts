@@ -14,6 +14,7 @@ export interface DashboardContinueLearning {
   lessonTitle: string;
   videoPosition: number;
   progressPercentage: number;
+  thumbnailUrl?: string | null;
 }
 
 export interface DashboardCourse {
@@ -38,6 +39,7 @@ export interface DashboardStatistics {
   lessonsCompleted: number;
   quizzesPassed: number;
   assignmentsSubmitted: number;
+  weeklyHours: number[];
 }
 
 export interface DashboardCertificate {

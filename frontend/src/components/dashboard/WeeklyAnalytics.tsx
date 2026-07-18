@@ -24,8 +24,8 @@ export const WeeklyAnalytics = memo(function WeeklyAnalytics({ data, isLoading }
   if (!data) return null;
 
   // Let's create beautiful SVG path metrics
-  const hoursData = [2, 5, data.hoursLearned > 0 ? data.hoursLearned * 0.4 : 1, data.hoursLearned > 0 ? data.hoursLearned * 0.7 : 3, data.hoursLearned];
-  const maxHours = Math.max(...hoursData, 5);
+  const hoursData = data.weeklyHours && data.weeklyHours.length > 0 ? data.weeklyHours : [0, 0, 0, 0, 0, 0, 0];
+  const maxHours = Math.max(...hoursData, 1);
   const sparkPoints = hoursData
     .map((h, i) => `${(i / (hoursData.length - 1)) * 140 + 10},${85 - (h / maxHours) * 60}`)
     .join(" ");
@@ -81,7 +81,7 @@ export const WeeklyAnalytics = memo(function WeeklyAnalytics({ data, isLoading }
               {/* Glowing endpoint dot */}
               <circle
                 cx={150}
-                cy={85 - (data.hoursLearned / maxHours) * 60}
+                cy={85 - (hoursData[hoursData.length - 1] / maxHours) * 60}
                 r="4.5"
                 fill="#f97316"
                 className="animate-pulse"

@@ -190,7 +190,7 @@ function CourseCard({ course }: { course: CourseItem }) {
 
       <div className="border-t border-zinc-100 dark:border-zinc-850 px-6 py-4 bg-zinc-50/50 dark:bg-zinc-900/40 flex items-center justify-between">
         <span className="text-lg font-black text-zinc-900 dark:text-zinc-50">
-          {course.price === 0 ? "Free" : `$${course.price}`}
+          {course.price === 0 ? "Free" : `₹${course.price}`}
         </span>
         <span className="inline-flex items-center justify-center font-bold text-xs text-zinc-700 hover:text-blue-600 dark:text-zinc-300 dark:hover:text-blue-400 gap-1 group-hover:translate-x-1 transition-all duration-200">
           View Details <ArrowRight className="ml-1 h-3.5 w-3.5" />

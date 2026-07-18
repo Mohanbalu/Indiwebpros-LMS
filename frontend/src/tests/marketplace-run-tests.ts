@@ -51,11 +51,11 @@ function run() {
   console.log("\n── Pricing Conversion Checks ──");
   
   const formattedPrice = (price: number) => {
-    return price === 0 ? "Free" : `$${price}`;
+    return price === 0 ? "Free" : `₹${price}`;
   };
 
   assert(formattedPrice(0) === "Free", "Pricing: 0 converts to Free label");
-  assert(formattedPrice(199) === "$199", "Pricing: Paid fee converts to dollars symbol badge");
+  assert(formattedPrice(199) === "₹199", "Pricing: Paid fee converts to Rupee symbol badge");
 
   console.log("\n🎉 All Course Marketplace UI tests passed successfully!");
 }

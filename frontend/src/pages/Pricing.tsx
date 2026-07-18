@@ -20,7 +20,7 @@ export default function Pricing() {
     },
     {
       name: "Intermediate",
-      price: "$19",
+      price: "₹1,599",
       description: "Perfect for builders leveling up their practical skills with auto-graded labs.",
       features: [
         "Access to intermediate curriculum courses",
@@ -34,7 +34,7 @@ export default function Pricing() {
     },
     {
       name: "Advanced",
-      price: "$49",
+      price: "₹4,199",
       description: "Designed for engineers targeting premium software developer positions.",
       features: [
         "Access to advanced SaaS architecture tracks",

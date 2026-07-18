@@ -16,11 +16,8 @@ export function BlankLayout() {
         <div className="absolute -top-20 -left-20 w-80 h-80 bg-blue-500/10 rounded-full blur-[100px] pointer-events-none" />
         <div className="absolute bottom-20 right-[-10%] w-96 h-96 bg-purple-500/10 rounded-full blur-[120px] pointer-events-none" />
 
-        {/* Top Header Logo */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg shadow-blue-500/20">
-            <Logo showText={false} size={24} />
-          </div>
+          <Logo showText={false} size={32} />
           <span className="text-lg font-black text-white tracking-tight">IWP LMS</span>
         </div>
 
@@ -97,9 +94,7 @@ export function BlankLayout() {
         
         {/* Tiny responsive logo block for mobile views */}
         <div className="lg:hidden flex items-center gap-2 mb-8 select-none">
-          <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg shadow-blue-500/20">
-            <Logo showText={false} size={20} />
-          </div>
+          <Logo showText={false} size={28} />
           <span className="text-base font-extrabold text-zinc-900 dark:text-white tracking-tight">IWP LMS</span>
         </div>
 

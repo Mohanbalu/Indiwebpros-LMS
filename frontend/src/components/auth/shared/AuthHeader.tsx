@@ -32,12 +32,12 @@ export function AuthHeader({
 
       {!illustration && showLogo && (
         <motion.div
-          className="inline-flex p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg shadow-blue-500/30 mb-6"
+          className="inline-flex mb-6"
           initial={{ scale: 0, rotate: -180 }}
           animate={{ scale: 1, rotate: 0 }}
           transition={{ type: "spring", stiffness: 500, damping: 17, delay: 0.2 }}
         >
-          <Logo className="text-white h-7 w-7" />
+          <Logo showText={false} size={36} />
         </motion.div>
       )}
 

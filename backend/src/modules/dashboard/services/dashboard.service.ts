@@ -62,7 +62,7 @@ export class StudentDashboardService {
         orderBy: { lastViewedAt: "desc" },
         include: {
           lesson: { include: { module: true } },
-          course: true,
+          course: { include: { thumbnail: true } },
         },
       }),
       // 3. Certificates
@@ -112,12 +112,49 @@ export class StudentDashboardService {
       }),
     ]);
 
+    // Calculate streak from RecentlyViewedLesson
+    const views = await prisma.recentlyViewedLesson.findMany({
+      where: { userId },
+      select: { lastViewedAt: true },
+      orderBy: { lastViewedAt: "desc" },
+    });
+
+    const uniqueDays = new Set<number>();
+    views.forEach(v => {
+      const dayIndex = Math.floor((v.lastViewedAt.getTime() + (5.5 * 60 * 60 * 1000)) / 86400000);
+      uniqueDays.add(dayIndex);
+    });
+
+    let streak = 0;
+    const sortedDays = Array.from(uniqueDays).sort((a, b) => b - a);
+    
+    if (sortedDays.length > 0) {
+      const todayIndex = Math.floor((Date.now() + (5.5 * 60 * 60 * 1000)) / 86400000);
+      if (sortedDays[0] === todayIndex || sortedDays[0] === todayIndex - 1) {
+        streak = 1;
+        for (let i = 1; i < sortedDays.length; i++) {
+          if (sortedDays[i] === sortedDays[i - 1] - 1) {
+            streak++;
+          } else {
+            break;
+          }
+        }
+      }
+    }
+
+    // Calculate total hours learned from LessonProgress
+    const timeSpentResult = await prisma.lessonProgress.aggregate({
+      where: { userId },
+      _sum: { watchTimeSeconds: true },
+    });
+    const totalLearningHours = Math.round(((timeSpentResult._sum.watchTimeSeconds ?? 0) / 3600) * 10) / 10;
+
     // Format Welcome section
     const welcome = {
       studentName: `${student.firstName} ${student.lastName}`,
       avatarUrl: student.avatarFile?.url ?? null,
-      learningStreak: student.learningStreak,
-      totalLearningHours: student.totalLearningHours,
+      learningStreak: streak,
+      totalLearningHours: totalLearningHours,
       memberSince: student.createdAt,
     };
 
@@ -132,6 +169,15 @@ export class StudentDashboardService {
         where: { userId_lessonId: { userId, lessonId: recentlyViewed.lessonId } },
       });
 
+      let thumbnailUrl = null;
+      if (recentlyViewed.course.thumbnail?.key) {
+        try {
+          thumbnailUrl = await ServiceContainer.storage.getSignedDownloadUrl(recentlyViewed.course.thumbnail.key, 3600);
+        } catch (err) {
+          thumbnailUrl = recentlyViewed.course.thumbnail.url;
+        }
+      }
+
       continueLearning = {
         courseId: recentlyViewed.courseId,
         courseTitle: recentlyViewed.course.title,
@@ -140,6 +186,7 @@ export class StudentDashboardService {
         lessonTitle: recentlyViewed.lesson.title,
         videoPosition: lessonProgress?.lastPositionSeconds ?? 0,
         progressPercentage: courseProgress?.progressPercentage ?? 0.0,
+        thumbnailUrl,
       };
     }
 
@@ -161,6 +208,10 @@ export class StudentDashboardService {
         }
 
         // Fetch progress
+        const courseProgress = await prisma.learningProgress.findUnique({
+          where: { userId_courseId: { userId, courseId: e.courseId } },
+        });
+
         return {
           id: e.id,
           courseId: e.courseId,
@@ -170,11 +221,40 @@ export class StudentDashboardService {
           instructorName: `${e.course.instructor.firstName} ${e.course.instructor.lastName}`,
           status: e.status,
           expiresAt: e.expiresAt,
-          completionPercentage: e.progressPercentage,
+          completionPercentage: courseProgress?.progressPercentage ?? 0.0,
           totalLessons,
         };
       })
     );
+
+    // Calculate last 7 days daily learning hours breakdown (IST timezone basis)
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000 + (5.5 * 60 * 60 * 1000));
+      return d.toISOString().split('T')[0];
+    }).reverse();
+
+    const recentProgresses = await prisma.lessonProgress.findMany({
+      where: {
+        userId,
+        lastAccessedAt: {
+          gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        },
+      },
+      select: {
+        watchTimeSeconds: true,
+        lastAccessedAt: true,
+      },
+    });
+
+    const dailyHoursMap = new Map<string, number>();
+    recentProgresses.forEach((p) => {
+      const localTime = new Date(p.lastAccessedAt.getTime() + (5.5 * 60 * 60 * 1000));
+      const dayStr = localTime.toISOString().split('T')[0];
+      const hours = p.watchTimeSeconds / 3600;
+      dailyHoursMap.set(dayStr, (dailyHoursMap.get(dayStr) ?? 0) + hours);
+    });
+
+    const weeklyHours = last7Days.map((day) => Math.round((dailyHoursMap.get(day) ?? 0) * 10) / 10);
 
     // Format Statistics block
     const completedCoursesCount = enrollments.filter((e) => e.status === EnrollmentStatus.COMPLETED).length;
@@ -182,10 +262,11 @@ export class StudentDashboardService {
       coursesEnrolled: enrollments.length,
       coursesCompleted: completedCoursesCount,
       certificatesEarned: certificates.length,
-      hoursLearned: student.totalLearningHours,
+      hoursLearned: totalLearningHours,
       lessonsCompleted: await prisma.lessonProgress.count({ where: { userId, completed: true } }),
       quizzesPassed: quizzesAttempts.filter((q) => q.passed).length,
       assignmentsSubmitted: assignmentsSubmissions.length,
+      weeklyHours,
     };
 
     // Format Quiz summary block

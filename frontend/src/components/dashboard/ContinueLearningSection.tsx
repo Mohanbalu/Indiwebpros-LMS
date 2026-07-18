@@ -53,11 +53,21 @@ export const ContinueLearningSection = memo(function ContinueLearningSection({ d
   return (
     <div className="group rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700/80 transition-all duration-300 overflow-hidden shadow-sm hover:shadow-md">
       <div className="flex flex-col sm:flex-row items-stretch">
-        <div className="relative w-full sm:w-56 h-40 sm:h-auto bg-gradient-to-br from-blue-600 to-indigo-700 shrink-0 flex items-center justify-center overflow-hidden">
-          <BookOpen className="h-10 w-10 text-white/20" />
-          <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/40 via-transparent to-transparent pointer-events-none" />
-          <div className="absolute bottom-4 left-4 right-4">
-            <div className="h-1.5 w-full rounded-full bg-white/25">
+        <div className="relative w-full sm:w-56 h-40 sm:h-auto shrink-0 overflow-hidden flex items-center justify-center">
+          {data.thumbnailUrl ? (
+            <img
+              src={data.thumbnailUrl}
+              alt={data.courseTitle}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center">
+              <BookOpen className="h-10 w-10 text-white/20" />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-zinc-955/60 via-transparent to-transparent pointer-events-none" />
+          <div className="absolute bottom-4 left-4 right-4 z-10">
+            <div className="h-1.5 w-full rounded-full bg-white/25 backdrop-blur-xs">
               <div
                 className="h-1.5 rounded-full bg-white transition-all duration-1000"
                 style={{ width: `${Math.min(data.progressPercentage, 100)}%` }}

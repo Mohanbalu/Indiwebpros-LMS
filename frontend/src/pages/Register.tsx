@@ -45,9 +45,8 @@ const registerSchema = z
 type RegisterFormInput = z.infer<typeof registerSchema>;
 
 const stepTitles: Record<number, { heading: string; sub: string }> = {
-  1: { heading: "Who are you?", sub: "Choose your role to personalize your experience" },
-  2: { heading: "Personal details", sub: "Tell us a bit about yourself" },
-  3: { heading: "Secure your account", sub: "Create a strong password to protect your account" },
+  1: { heading: "Personal details", sub: "Tell us a bit about yourself" },
+  2: { heading: "Secure your account", sub: "Create a strong password to protect your account" },
 };
 
 const slideVariants = {
@@ -94,7 +93,7 @@ export default function Register() {
     const isValid = await trigger(fields);
     if (isValid) {
       setDirection(1);
-      setStep((s) => Math.min(s + 1, 3));
+      setStep((s) => Math.min(s + 1, 2));
     }
   };
 
@@ -140,8 +139,8 @@ export default function Register() {
       {/* Step Progress */}
       <StepProgressBar
         currentStep={step}
-        totalSteps={3}
-        stepLabels={["Role", "Details", "Password"]}
+        totalSteps={2}
+        stepLabels={["Details", "Password"]}
       />
 
       {/* Step Header */}
@@ -175,63 +174,10 @@ export default function Register() {
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <AnimatePresence mode="wait" custom={direction}>
-          {/* STEP 1: Role Selection */}
+          {/* STEP 1: Personal Info */}
           {step === 1 && (
             <motion.div
               key="step-1"
-              custom={direction}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.3, ease: "easeInOut" }}
-              className="space-y-6"
-            >
-              <input type="radio" {...register("roleName")} value={roleNameVal} className="sr-only" />
-              <RoleSelector
-                value={roleNameVal}
-                onChange={(val) => setValue("roleName", val as "Student" | "Instructor" | "Mentor")}
-                options={[
-                  {
-                    value: "Student",
-                    label: "Student",
-                    description: "Learn modern technology with expert-curated paths",
-                    features: ["40+ Courses", "Projects", "Certificates", "Mentorship"],
-                    accentColor: "blue",
-                  },
-                  {
-                    value: "Instructor",
-                    label: "Instructor",
-                    description: "Design curriculum, mock setups, and learning modules",
-                    features: ["Course Builder", "Analytics", "Revenue Share", "Students"],
-                    accentColor: "purple",
-                  },
-                  {
-                    value: "Mentor",
-                    label: "Mentor",
-                    description: "Verify capstones and guide developers to mastery",
-                    features: ["Review Queue", "Guidance Tools", "Expert Network", "Recognition"],
-                    accentColor: "emerald",
-                  },
-                ]}
-              />
-              <Button
-                type="button"
-                onClick={() => goNext(["roleName"])}
-                className="w-full py-3.5 text-sm font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-300 transform hover:scale-[1.01] active:scale-[0.99]"
-              >
-                <span className="flex items-center justify-center gap-2">
-                  Continue
-                  <ArrowRight className="h-4 w-4" />
-                </span>
-              </Button>
-            </motion.div>
-          )}
-
-          {/* STEP 2: Personal Info */}
-          {step === 2 && (
-            <motion.div
-              key="step-2"
               custom={direction}
               variants={slideVariants}
               initial="enter"
@@ -329,7 +275,7 @@ export default function Register() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={goBack}
+                  onClick={() => navigate(ROUTES.login)}
                   className="flex-1 py-3.5 rounded-xl text-sm font-bold border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all duration-200"
                 >
                   <span className="flex items-center justify-center gap-1.5">
@@ -351,8 +297,8 @@ export default function Register() {
             </motion.div>
           )}
 
-          {/* STEP 3: Password */}
-          {step === 3 && (
+          {/* STEP 2: Password */}
+          {step === 2 && (
             <motion.div
               key="step-3"
               custom={direction}

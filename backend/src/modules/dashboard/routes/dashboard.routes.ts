@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { StudentDashboardController } from "../controllers/dashboard.controller";
+import { ProfileController } from "../controllers/profile.controller";
 import { authGuard } from "@/middlewares/auth";
 import rateLimit from "express-rate-limit";
 
@@ -19,5 +20,10 @@ router.get("/notes", readRl, StudentDashboardController.getNotes);
 router.get("/quizzes", readRl, StudentDashboardController.getQuizzes);
 router.get("/assignments", readRl, StudentDashboardController.getAssignments);
 router.get("/security", readRl, StudentDashboardController.getSecurity);
+
+// Profile Tab Dashboard routes
+router.get("/profile", readRl, ProfileController.getProfileData);
+router.put("/profile", ProfileController.updateProfileSettings);
+router.post("/profile/wishlist", ProfileController.toggleWishlist);
 
 export default router;

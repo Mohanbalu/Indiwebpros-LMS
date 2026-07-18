@@ -720,7 +720,7 @@ function CoursesView({ data, isLoading, selectedCourseId, setSelectedCourseId, i
 
             {!courseForm.isFree && (
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-zinc-650 dark:text-zinc-400">One-time Price ($ USD)</label>
+                <label className="block text-xs font-bold text-zinc-650 dark:text-zinc-400">One-time Price (₹ INR)</label>
                 <input 
                   type="number"
                   value={courseForm.price}

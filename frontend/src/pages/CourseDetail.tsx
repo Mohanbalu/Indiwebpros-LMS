@@ -99,133 +99,43 @@ export default function CourseDetail() {
   return (
     <div className="bg-white dark:bg-zinc-950 py-12">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <Link to={ROUTES.courses} className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 mb-8">
+        <Link to={ROUTES.courses} className="inline-flex items-center gap-1.5 text-sm text-zinc-550 hover:text-zinc-700 dark:hover:text-zinc-300 mb-8">
           <ArrowLeft className="h-4 w-4" /> Back to pathways
         </Link>
 
-        {/* Hero split section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 mb-16">
-          <div className="lg:col-span-2">
-            <span className="inline-block rounded-full bg-blue-50 dark:bg-blue-900/30 px-3 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400 mb-4">
-              {course.category.name}
-            </span>
-            <h1 className="course-title text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl lg:text-5xl leading-tight">
-              {course.title}
-            </h1>
-            <p className="mt-4 text-lg text-zinc-650 dark:text-zinc-400 leading-relaxed">
-              {course.description}
-            </p>
-
-            <div className="mt-6 flex flex-wrap gap-6 items-center text-sm text-zinc-500 dark:text-zinc-400 font-medium border-y border-zinc-200/50 dark:border-zinc-805 py-4">
-              <span className="flex items-center gap-1.5">
-                <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" /> {course.duration}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Users className="h-4 w-4 text-indigo-600 dark:text-indigo-400" /> {course.studentsCount} Enrolled
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Star className="h-4 w-4 text-amber-400 fill-amber-400" /> {course.rating} Rating
-              </span>
-              <span className="flex items-center gap-1.5">
-                <ShieldCheck className="h-4 w-4 text-teal-600 dark:text-teal-400" /> {course.level} Level
-              </span>
-            </div>
-          </div>
-
-          {/* Pricing Enrollment Card */}
-          <div className="bg-zinc-50 dark:bg-zinc-900 p-8 rounded-3xl border border-zinc-200/60 dark:border-zinc-800/80 flex flex-col justify-between shadow-sm">
-            <div>
-              {/* Media Area */}
-              <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-zinc-950 border border-zinc-200/50 dark:border-zinc-800/85 shadow-md mb-6">
-                {course.previewVideoUrl ? (
-                  <video
-                    src={course.previewVideoUrl}
-                    poster={course.thumbnailUrl}
-                    controls
-                    className="h-full w-full object-cover"
-                  />
-                ) : course.thumbnailUrl ? (
-                  <img
-                    src={course.thumbnailUrl}
-                    alt={course.title}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="h-full w-full bg-gradient-to-br from-blue-600/20 to-indigo-600/30 flex items-center justify-center">
-                    <span className="text-xs font-bold text-zinc-450">No preview media available</span>
-                  </div>
-                )}
-              </div>
-
-              <span className="text-xs text-zinc-400 dark:text-zinc-500 uppercase tracking-widest font-bold">Pathway Access Fee</span>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-4xl font-black text-zinc-900 dark:text-zinc-50">
-                  {course.price === 0 ? "Free" : `$${course.price}`}
-                </span>
-                <span className="text-sm text-zinc-400 dark:text-zinc-500">One-time payment</span>
-              </div>
-              <ul className="mt-6 space-y-3 text-xs text-zinc-600 dark:text-zinc-400 font-medium">
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-emerald-500" /> Full lifetime access
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-emerald-500" /> 1-on-1 industry code feedback
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-emerald-500" /> Interactive sandbox environments
-                </li>
-              </ul>
-            </div>
-            <div className="mt-8">
-              {isEnrolled ? (
-                <Link to={ROUTES.player}>
-                  <Button className="w-full start-learning-btn" size="lg">Start Learning</Button>
-                </Link>
-              ) : course.price === 0 ? (
-                <Button
-                  onClick={async () => {
-                    if (!user) {
-                      navigate(`${ROUTES.login}?redirect=/courses/${slug}`);
-                      return;
-                    }
-                    try {
-                      await enrollFree({ courseId: course.id });
-                      navigate(ROUTES.player);
-                    } catch (error) {
-                      console.error("[CourseDetail] Free enrollment failed:", error);
-                    }
-                  }}
-                  className="w-full enroll-btn"
-                  size="lg"
-                  disabled={paymentState === "payment_processing"}
-                >
-                  {paymentState === "payment_processing" ? "Enrolling..." : "Enroll Now"}
-                </Button>
-              ) : (
-                <Button
-                  onClick={() => {
-                    if (!user) {
-                      navigate(`${ROUTES.login}?redirect=/courses/${slug}`);
-                      return;
-                    }
-                    navigate(`/payments/checkout?courseId=${course.id}`);
-                  }}
-                  className="w-full enroll-btn"
-                  size="lg"
-                >
-                  Buy Now
-                </Button>
-              )}
-              <p className="mt-3 text-center text-xs text-zinc-400 dark:text-zinc-500 font-medium">
-                30-day money-back guarantee policy applies
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Content sections */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        {/* Unified 2-Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-start">
+          
+          {/* LEFT COLUMN: Course Info & Curriculum */}
           <div className="lg:col-span-2 space-y-12">
+            {/* Title & Description Hero Block */}
+            <div>
+              <span className="inline-block rounded-full bg-blue-50 dark:bg-blue-900/30 px-3 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400 mb-4">
+                {course.category.name}
+              </span>
+              <h1 className="course-title text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl lg:text-5xl leading-tight">
+                {course.title}
+              </h1>
+              <p className="mt-4 text-lg text-zinc-650 dark:text-zinc-400 leading-relaxed">
+                {course.description}
+              </p>
+
+              <div className="mt-6 flex flex-wrap gap-6 items-center text-sm text-zinc-500 dark:text-zinc-400 font-medium border-y border-zinc-200/50 dark:border-zinc-805 py-4">
+                <span className="flex items-center gap-1.5">
+                  <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" /> {course.duration}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Users className="h-4 w-4 text-indigo-600 dark:text-indigo-400" /> {course.studentsCount} Enrolled
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Star className="h-4 w-4 text-amber-400 fill-amber-400" /> {course.rating} Rating
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <ShieldCheck className="h-4 w-4 text-teal-600 dark:text-teal-400" /> {course.level} Level
+                </span>
+              </div>
+            </div>
+
             {/* Outcomes */}
             {course.outcomes && course.outcomes.length > 0 && (
               <div>
@@ -305,8 +215,99 @@ export default function CourseDetail() {
             )}
           </div>
 
-          {/* Sidebar instructor card */}
-          <div>
+          {/* RIGHT COLUMN: Sticky Purchase Card & Instructor Info */}
+          <div className="space-y-8 lg:sticky lg:top-24">
+            {/* Pricing Enrollment Card */}
+            <div className="bg-zinc-50 dark:bg-zinc-900 p-8 rounded-3xl border border-zinc-200/60 dark:border-zinc-800/80 flex flex-col justify-between shadow-sm">
+              <div>
+                {/* Media Area */}
+                <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-zinc-950 border border-zinc-200/50 dark:border-zinc-800/85 shadow-md mb-6">
+                  {course.previewVideoUrl ? (
+                    <video
+                      src={course.previewVideoUrl}
+                      poster={course.thumbnailUrl}
+                      controls
+                      className="h-full w-full object-cover"
+                    />
+                  ) : course.thumbnailUrl ? (
+                    <img
+                      src={course.thumbnailUrl}
+                      alt={course.title}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-full w-full bg-gradient-to-br from-blue-600/20 to-indigo-600/30 flex items-center justify-center">
+                      <span className="text-xs font-bold text-zinc-455">No preview available</span>
+                    </div>
+                  )}
+                </div>
+
+                <span className="text-xs text-zinc-400 dark:text-zinc-500 uppercase tracking-widest font-bold">Pathway Access Fee</span>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-4xl font-black text-zinc-900 dark:text-zinc-50">
+                    {course.price === 0 ? "Free" : `₹${course.price}`}
+                  </span>
+                  <span className="text-sm text-zinc-400 dark:text-zinc-500">One-time payment</span>
+                </div>
+                <ul className="mt-6 space-y-3 text-xs text-zinc-600 dark:text-zinc-400 font-medium">
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-emerald-500" /> Full lifetime access
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-emerald-500" /> 1-on-1 industry code feedback
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-emerald-500" /> Interactive sandbox environments
+                  </li>
+                </ul>
+              </div>
+              <div className="mt-8">
+                {isEnrolled ? (
+                  <Link to={ROUTES.player}>
+                    <Button className="w-full start-learning-btn" size="lg">Start Learning</Button>
+                  </Link>
+                ) : course.price === 0 ? (
+                  <Button
+                    onClick={async () => {
+                      if (!user) {
+                        navigate(`${ROUTES.login}?redirect=/courses/${slug}`);
+                        return;
+                      }
+                      try {
+                        await enrollFree({ courseId: course.id });
+                        navigate(ROUTES.player);
+                      } catch (error) {
+                        console.error("[CourseDetail] Free enrollment failed:", error);
+                      }
+                    }}
+                    className="w-full enroll-btn"
+                    size="lg"
+                    disabled={paymentState === "payment_processing"}
+                  >
+                    {paymentState === "payment_processing" ? "Enrolling..." : "Enroll Now"}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => {
+                      if (!user) {
+                        navigate(`${ROUTES.login}?redirect=/courses/${slug}`);
+                        return;
+                      }
+                      navigate(`/payments/checkout?courseId=${course.id}`);
+                    }}
+                    className="w-full enroll-btn"
+                    size="lg"
+                  >
+                    Buy Now
+                  </Button>
+                )}
+                <p className="mt-3 text-center text-xs text-zinc-400 dark:text-zinc-500 font-medium">
+                  30-day money-back guarantee policy applies
+                </p>
+              </div>
+            </div>
+
+            {/* Sidebar instructor card */}
             <div className="p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/10">
               <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 mb-4">Pathway Instructor</h3>
               <div className="flex gap-4 items-center mb-4">
@@ -325,6 +326,7 @@ export default function CourseDetail() {
               </p>
             </div>
           </div>
+
         </div>
       </div>
     </div>
