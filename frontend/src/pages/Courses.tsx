@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Search, Filter, Clock, Users, Star, ArrowRight, ShieldCheck, Grid, List, CheckCircle, X } from "lucide-react";
@@ -19,6 +19,8 @@ interface CourseItem {
   category: { name: string };
   instructor: { firstName: string; lastName: string };
   createdAt: string;
+  thumbnailUrl?: string;
+  previewVideoUrl?: string;
 }
 
 const fallbackCourses: CourseItem[] = [
@@ -35,6 +37,8 @@ const fallbackCourses: CourseItem[] = [
     category: { name: "Full Stack Development" },
     instructor: { firstName: "Mohan", lastName: "Balu" },
     createdAt: new Date().toISOString(),
+    thumbnailUrl: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&auto=format&fit=crop&q=80",
+    previewVideoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
   },
   {
     id: "course-2",
@@ -49,6 +53,8 @@ const fallbackCourses: CourseItem[] = [
     category: { name: "AI & Machine Learning" },
     instructor: { firstName: "Jessica", lastName: "Chen" },
     createdAt: new Date(Date.now() - 86400000).toISOString(),
+    thumbnailUrl: "https://images.unsplash.com/photo-1677442136019-21780efad99a?w=600&auto=format&fit=crop&q=80",
+    previewVideoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
   },
   {
     id: "course-3",
@@ -63,6 +69,8 @@ const fallbackCourses: CourseItem[] = [
     category: { name: "Cloud Computing" },
     instructor: { firstName: "David", lastName: "Miller" },
     createdAt: new Date(Date.now() - 172800000).toISOString(),
+    thumbnailUrl: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop&q=80",
+    previewVideoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
   },
   {
     id: "course-4",
@@ -77,8 +85,120 @@ const fallbackCourses: CourseItem[] = [
     category: { name: "UI/UX Product Design" },
     instructor: { firstName: "Jessica", lastName: "Chen" },
     createdAt: new Date(Date.now() - 259200000).toISOString(),
+    thumbnailUrl: "https://images.unsplash.com/photo-1561070791-26c113006238?w=600&auto=format&fit=crop&q=80",
+    previewVideoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
   },
 ];
+
+function CourseCard({ course }: { course: CourseItem }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const hoverTimeoutRef = useRef<number | null>(null);
+
+  const handleMouseEnter = () => {
+    if (course.previewVideoUrl) {
+      hoverTimeoutRef.current = window.setTimeout(() => {
+        setIsPlaying(true);
+        videoRef.current?.play().catch(() => {});
+      }, 500);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    setIsPlaying(false);
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+  };
+
+  return (
+    <Link
+      to={`/courses/${course.slug}`}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className="course-card group relative flex flex-col justify-between overflow-hidden rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/80 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md cursor-pointer text-inherit no-underline"
+    >
+      {/* Thumbnail / Video Preview Area */}
+      <div className="relative h-48 w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800 border-b border-zinc-150 dark:border-zinc-850">
+        {course.previewVideoUrl && isPlaying ? (
+          <video
+            ref={videoRef}
+            src={course.previewVideoUrl}
+            muted
+            playsInline
+            loop
+            autoPlay
+            className="h-full w-full object-cover transition-opacity duration-300"
+          />
+        ) : course.thumbnailUrl ? (
+          <img
+            src={course.thumbnailUrl}
+            alt={course.title}
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className="h-full w-full bg-gradient-to-br from-blue-600/20 to-indigo-600/30 flex items-center justify-center">
+            <span className="text-sm font-bold text-zinc-400">No Preview</span>
+          </div>
+        )}
+
+        {/* Small Video Preview Badge */}
+        {course.previewVideoUrl && (
+          <span className="absolute bottom-3 right-3 bg-zinc-950/80 backdrop-blur-xs text-[9px] font-black text-white px-2 py-0.5 rounded-full flex items-center gap-1 uppercase tracking-wider select-none z-10">
+            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-ping" />
+            Preview
+          </span>
+        )}
+      </div>
+
+      <div className="p-6 flex-1 flex flex-col justify-between">
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <span className="inline-block rounded-full bg-blue-50 dark:bg-blue-900/30 px-2.5 py-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
+              {course.category.name}
+            </span>
+            <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500">
+              {course.level}
+            </span>
+          </div>
+
+          <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
+            {course.title}
+          </h3>
+
+          <p className="mt-2 text-sm text-zinc-550 dark:text-zinc-400 line-clamp-3 leading-relaxed">
+            {course.description}
+          </p>
+        </div>
+
+        <div className="mt-4 flex items-center gap-4 text-xs text-zinc-400 dark:text-zinc-500 font-medium">
+          <span className="flex items-center gap-1">
+            <Clock className="h-3.5 w-3.5 text-zinc-400" /> {course.duration}
+          </span>
+          <span className="flex items-center gap-1">
+            <Users className="h-3.5 w-3.5 text-zinc-400" /> {course.studentsCount} Students
+          </span>
+          <span className="flex items-center gap-1">
+            <Star className="h-3.5 w-3.5 text-amber-400 fill-amber-400" /> {course.rating}
+          </span>
+        </div>
+      </div>
+
+      <div className="border-t border-zinc-100 dark:border-zinc-850 px-6 py-4 bg-zinc-50/50 dark:bg-zinc-900/40 flex items-center justify-between">
+        <span className="text-lg font-black text-zinc-900 dark:text-zinc-50">
+          {course.price === 0 ? "Free" : `$${course.price}`}
+        </span>
+        <span className="inline-flex items-center justify-center font-bold text-xs text-zinc-700 hover:text-blue-600 dark:text-zinc-300 dark:hover:text-blue-400 gap-1 group-hover:translate-x-1 transition-all duration-200">
+          View Details <ArrowRight className="ml-1 h-3.5 w-3.5" />
+        </span>
+      </div>
+    </Link>
+  );
+}
 
 export default function Courses() {
   // Search & suggestions state
@@ -115,22 +235,26 @@ export default function Courses() {
     ? ["All", ...categoryRes.data.map((c: any) => c.name)]
     : ["All", "Full Stack Development", "AI & Machine Learning", "Cloud Computing", "UI/UX Product Design"];
 
-  const rawCourses: CourseItem[] = coursesRes?.success && Array.isArray(coursesRes.data)
-    ? coursesRes.data.map((c: any) => ({
-        id: c.id,
-        title: c.title,
-        slug: c.slug,
-        description: c.shortDescription || c.description || "",
-        level: c.difficulty ? (c.difficulty.charAt(0) + c.difficulty.slice(1).toLowerCase()) : "Beginner",
-        price: c.price || 0,
-        duration: c.durationMinutes ? `${Math.round(c.durationMinutes / 60)} hrs` : "Self-paced",
-        rating: 4.8,
-        studentsCount: c._count?.enrollments || 0,
-        category: c.category || { name: "General" },
-        instructor: c.instructor || { firstName: "Unknown", lastName: "Instructor" },
-        createdAt: c.createdAt || new Date().toISOString(),
-      }))
-    : fallbackCourses;
+  const rawCourses = useMemo<CourseItem[]>(() => {
+    return coursesRes?.success && Array.isArray(coursesRes.data)
+      ? coursesRes.data.map((c: any) => ({
+          id: c.id,
+          title: c.title,
+          slug: c.slug,
+          description: c.shortDescription || c.description || "",
+          level: c.difficulty ? (c.difficulty.charAt(0) + c.difficulty.slice(1).toLowerCase()) : "Beginner",
+          price: c.price || 0,
+          duration: c.durationMinutes ? `${Math.round(c.durationMinutes / 60)} hrs` : "Self-paced",
+          rating: 4.8,
+          studentsCount: c._count?.enrollments || 0,
+          category: c.category || { name: "General" },
+          instructor: c.instructor || { firstName: "Unknown", lastName: "Instructor" },
+          createdAt: c.createdAt || new Date().toISOString(),
+          thumbnailUrl: c.thumbnail?.url || "",
+          previewVideoUrl: c.previewVideo?.url || "",
+        }))
+      : fallbackCourses;
+  }, [coursesRes]);
 
 
   // Handle Search suggestions
@@ -397,51 +521,7 @@ export default function Courses() {
             ) : (
               <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
                 {filteredCourses.map((course) => (
-                  <Link
-                    key={course.id}
-                    to={`/courses/${course.slug}`}
-                    className="course-card group relative flex flex-col justify-between overflow-hidden rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/80 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md cursor-pointer text-inherit no-underline"
-                  >
-                    <div className="p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <span className="inline-block rounded-full bg-blue-50 dark:bg-blue-900/30 px-2.5 py-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
-                          {course.category.name}
-                        </span>
-                        <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500">
-                          {course.level}
-                        </span>
-                      </div>
-
-                      <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
-                        {course.title}
-                      </h3>
-
-                      <p className="mt-2 text-sm text-zinc-550 dark:text-zinc-400 line-clamp-3 leading-relaxed">
-                        {course.description}
-                      </p>
-
-                      <div className="mt-4 flex items-center gap-4 text-xs text-zinc-400 dark:text-zinc-500 font-medium">
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3.5 w-3.5 text-zinc-400" /> {course.duration}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Users className="h-3.5 w-3.5 text-zinc-400" /> {course.studentsCount} Students
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Star className="h-3.5 w-3.5 text-amber-400 fill-amber-400" /> {course.rating}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="border-t border-zinc-100 dark:border-zinc-850 px-6 py-4 bg-zinc-50/50 dark:bg-zinc-900/40 flex items-center justify-between">
-                      <span className="text-lg font-black text-zinc-900 dark:text-zinc-50">
-                        {course.price === 0 ? "Free" : `$${course.price}`}
-                      </span>
-                      <span className="inline-flex items-center justify-center font-bold text-xs text-zinc-700 hover:text-blue-600 dark:text-zinc-300 dark:hover:text-blue-400 gap-1 group-hover:translate-x-1 transition-all duration-200">
-                        View Details <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                      </span>
-                    </div>
-                  </Link>
+                  <CourseCard key={course.id} course={course} />
                 ))}
               </div>
             )}

@@ -28,6 +28,8 @@ interface CourseDetailData {
     description?: string;
     lessons: { id: string; title: string; duration: number; isPreview?: boolean }[];
   }[];
+  thumbnailUrl?: string;
+  previewVideoUrl?: string;
 }
 
 export default function CourseDetail() {
@@ -58,7 +60,12 @@ export default function CourseDetail() {
   });
 
   const course: CourseDetailData | null = courseRes?.success && courseRes.data
-    ? courseRes.data
+    ? {
+        ...courseRes.data,
+        studentsCount: courseRes.data._count?.enrollments || 0,
+        thumbnailUrl: courseRes.data.thumbnail?.url || "",
+        previewVideoUrl: courseRes.data.previewVideo?.url || "",
+      }
     : null;
 
   const isEnrolled = myCourses?.data?.some(
@@ -128,6 +135,28 @@ export default function CourseDetail() {
           {/* Pricing Enrollment Card */}
           <div className="bg-zinc-50 dark:bg-zinc-900 p-8 rounded-3xl border border-zinc-200/60 dark:border-zinc-800/80 flex flex-col justify-between shadow-sm">
             <div>
+              {/* Media Area */}
+              <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-zinc-950 border border-zinc-200/50 dark:border-zinc-800/85 shadow-md mb-6">
+                {course.previewVideoUrl ? (
+                  <video
+                    src={course.previewVideoUrl}
+                    poster={course.thumbnailUrl}
+                    controls
+                    className="h-full w-full object-cover"
+                  />
+                ) : course.thumbnailUrl ? (
+                  <img
+                    src={course.thumbnailUrl}
+                    alt={course.title}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="h-full w-full bg-gradient-to-br from-blue-600/20 to-indigo-600/30 flex items-center justify-center">
+                    <span className="text-xs font-bold text-zinc-450">No preview media available</span>
+                  </div>
+                )}
+              </div>
+
               <span className="text-xs text-zinc-400 dark:text-zinc-500 uppercase tracking-widest font-bold">Pathway Access Fee</span>
               <div className="mt-2 flex items-baseline gap-2">
                 <span className="text-4xl font-black text-zinc-900 dark:text-zinc-50">

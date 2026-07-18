@@ -1,8 +1,9 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { Check, Star, Sparkles, Code, Brain, Cloud, Shield, Activity } from "lucide-react";
 import { Logo } from "@/components/common/Logo";
 
 export function BlankLayout() {
+  const location = useLocation();
   return (
     <div className="min-h-screen w-full flex flex-col lg:flex-row bg-[#F8FAFC] dark:bg-zinc-950 transition-colors duration-300">
       
@@ -103,7 +104,7 @@ export function BlankLayout() {
         </div>
 
         <div className="relative z-10 w-full max-w-[450px]">
-          <Outlet />
+          <Outlet key={location.pathname} />
         </div>
       </div>
     </div>

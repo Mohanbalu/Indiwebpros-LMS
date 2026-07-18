@@ -15,6 +15,7 @@ const COURSE_INCLUDE = {
   faqs: { orderBy: { sortOrder: "asc" as const } },
   requirements: { orderBy: { sortOrder: "asc" as const } },
   outcomes: { orderBy: { sortOrder: "asc" as const } },
+  _count: { select: { enrollments: true } },
 };
 
 export class CourseService {

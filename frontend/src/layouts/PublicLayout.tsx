@@ -1,12 +1,13 @@
-import { Outlet, Link } from "react-router-dom";
+import { Outlet, Link, useLocation } from "react-router-dom";
 import { Navbar } from "@/components/common/Navbar";
 
 export function PublicLayout() {
+  const location = useLocation();
   return (
     <div className="flex min-h-screen flex-col bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
       <Navbar />
       <main className="flex-1">
-        <Outlet />
+        <Outlet key={location.pathname} />
       </main>
       <footer className="border-t border-zinc-150 bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-900/10 py-12 text-zinc-500 text-xs mt-auto">
         <div className="mx-auto max-w-7xl px-6 lg:px-8 grid grid-cols-2 md:grid-cols-4 gap-8 mb-8 text-left">

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { Menu, Bell } from "lucide-react";
 import { Sidebar } from "@/components/common/Sidebar";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
@@ -11,6 +11,7 @@ export function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
 
   const { data: dashboardData } = useDashboard();
   const notifications = dashboardData?.notifications;
@@ -124,7 +125,7 @@ export function DashboardLayout() {
 
         {/* Dynamic Page Content */}
         <main className="flex-1 p-6">
-          <Outlet />
+          <Outlet key={location.pathname} />
         </main>
       </div>
     </div>
