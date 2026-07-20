@@ -12,7 +12,7 @@ export const WeeklyAnalytics = memo(function WeeklyAnalytics({ data, isLoading }
   if (isLoading) {
     return (
       <div className="rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 space-y-5">
-        <Skeleton className="h-5 w-40 bg-zinc-150 dark:bg-zinc-850" />
+        <Skeleton className="h-5 w-40 bg-zinc-150 dark:bg-zinc-900" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Skeleton className="h-32 rounded-2xl bg-zinc-100 dark:bg-zinc-950/40" />
           <Skeleton className="h-32 rounded-2xl bg-zinc-100 dark:bg-zinc-950/40" />

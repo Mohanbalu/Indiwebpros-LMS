@@ -381,7 +381,7 @@ export default function Profile() {
                           key={idx}
                           title={`${day.dateStr}: ${day.count} active entries`}
                           className={`h-3 w-3 rounded-xs transition-colors cursor-pointer ${
-                            day.count === 0 ? "bg-zinc-150 dark:bg-zinc-850 hover:bg-zinc-200" :
+                            day.count === 0 ? "bg-zinc-150 dark:bg-zinc-900 hover:bg-zinc-200" :
                             day.count === 1 ? "bg-emerald-200 dark:bg-emerald-950/40 border border-emerald-300/30" :
                             day.count === 2 ? "bg-emerald-400 dark:bg-emerald-800" :
                             "bg-emerald-600 dark:bg-emerald-600"
@@ -392,7 +392,7 @@ export default function Profile() {
                     <div className="flex items-center justify-end gap-3 text-[10px] font-bold text-zinc-450 dark:text-zinc-500 tracking-wide uppercase">
                       <span>Less</span>
                       <div className="flex items-center gap-1">
-                        <div className="h-2.5 w-2.5 rounded bg-zinc-150 dark:bg-zinc-850" />
+                        <div className="h-2.5 w-2.5 rounded bg-zinc-150 dark:bg-zinc-900" />
                         <div className="h-2.5 w-2.5 rounded bg-emerald-200" />
                         <div className="h-2.5 w-2.5 rounded bg-emerald-400" />
                         <div className="h-2.5 w-2.5 rounded bg-emerald-600" />
@@ -515,7 +515,7 @@ export default function Profile() {
                           <div className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs ${
                             node.status === "COMPLETED" ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-600" :
                             node.status === "CURRENT" ? "bg-blue-100 dark:bg-blue-950 text-blue-600 border border-blue-300/30 animate-pulse" :
-                            "bg-zinc-100 dark:bg-zinc-850 text-zinc-400"
+                            "bg-zinc-100 dark:bg-zinc-900 text-zinc-400"
                           }`}>
                             {node.status === "COMPLETED" ? <Check className="h-3.5 w-3.5" /> : node.id}
                           </div>
@@ -619,7 +619,7 @@ export default function Profile() {
                     }`}>
                       <CardContent className="p-4 flex flex-col items-center justify-between h-36">
                         <div className={`h-12 w-12 rounded-full flex items-center justify-center ${
-                          badge.unlocked ? "bg-amber-100 dark:bg-amber-950 text-amber-500" : "bg-zinc-100 dark:bg-zinc-850 text-zinc-400"
+                          badge.unlocked ? "bg-amber-100 dark:bg-amber-950 text-amber-500" : "bg-zinc-100 dark:bg-zinc-900 text-zinc-400"
                         }`}>
                           <Award className="h-6 w-6" />
                         </div>

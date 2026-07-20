@@ -40,7 +40,7 @@ const KpiSkeleton = memo(function KpiSkeleton() {
       <div className="flex items-center justify-between">
         <div className="space-y-2">
           <Skeleton className="h-3 w-20 bg-zinc-100 dark:bg-zinc-800" />
-          <Skeleton className="h-9 w-16 bg-zinc-200 dark:bg-zinc-850" />
+          <Skeleton className="h-9 w-16 bg-zinc-200 dark:bg-zinc-900" />
         </div>
         <Skeleton className="h-12 w-12 rounded-2xl bg-zinc-150 dark:bg-zinc-800" />
       </div>

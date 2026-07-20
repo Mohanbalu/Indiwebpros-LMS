@@ -41,8 +41,8 @@ export const NotificationDrawer = memo(function NotificationDrawer({
             <div key={i} className="flex gap-3">
               <Skeleton className="h-8 w-8 rounded-full shrink-0 bg-zinc-150 dark:bg-zinc-800" />
               <div className="flex-1 space-y-1">
-                <Skeleton className="h-4 w-32 bg-zinc-200 dark:bg-zinc-850" />
-                <Skeleton className="h-3 w-40 bg-zinc-200 dark:bg-zinc-850" />
+                <Skeleton className="h-4 w-32 bg-zinc-200 dark:bg-zinc-900" />
+                <Skeleton className="h-3 w-40 bg-zinc-200 dark:bg-zinc-900" />
               </div>
             </div>
           ))}

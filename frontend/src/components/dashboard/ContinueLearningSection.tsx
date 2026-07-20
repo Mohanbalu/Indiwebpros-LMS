@@ -19,8 +19,8 @@ export const ContinueLearningSection = memo(function ContinueLearningSection({ d
         <div className="mt-4 flex flex-col md:flex-row gap-5">
           <Skeleton className="h-28 w-full md:w-48 rounded-2xl shrink-0 bg-zinc-150 dark:bg-zinc-800" />
           <div className="flex-1 space-y-3">
-            <Skeleton className="h-5 w-3/4 bg-zinc-200 dark:bg-zinc-850" />
-            <Skeleton className="h-4 w-1/2 bg-zinc-200 dark:bg-zinc-850" />
+            <Skeleton className="h-5 w-3/4 bg-zinc-200 dark:bg-zinc-900" />
+            <Skeleton className="h-4 w-1/2 bg-zinc-200 dark:bg-zinc-900" />
             <Skeleton className="h-2 w-full rounded-full bg-zinc-150 dark:bg-zinc-800" />
             <Skeleton className="h-10 w-36 rounded-xl bg-zinc-150 dark:bg-zinc-800" />
           </div>

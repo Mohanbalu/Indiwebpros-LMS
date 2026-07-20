@@ -105,6 +105,18 @@ export function useUpdateCourseMutation() {
   });
 }
 
+function invalidateStudentCourseCaches(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: ["studentDashboard"] });
+  queryClient.invalidateQueries({ queryKey: ["courses"] });
+  queryClient.invalidateQueries({ queryKey: ["myCourses"] });
+  queryClient.invalidateQueries({ queryKey: ["my-courses"] });
+  queryClient.invalidateQueries({ queryKey: ["enrollments"] });
+  queryClient.invalidateQueries({ queryKey: ["resumeLearning"] });
+  queryClient.invalidateQueries({ queryKey: ["courseStructure"] });
+  queryClient.invalidateQueries({ queryKey: ["courseDetail"] });
+  queryClient.invalidateQueries({ queryKey: ["myCertificates"] });
+}
+
 export function usePublishCourseMutation() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -112,6 +124,7 @@ export function usePublishCourseMutation() {
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ["instructorCourses"] });
       queryClient.invalidateQueries({ queryKey: ["instructorCourse", id] });
+      invalidateStudentCourseCaches(queryClient);
     },
   });
 }
@@ -123,6 +136,7 @@ export function useArchiveCourseMutation() {
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ["instructorCourses"] });
       queryClient.invalidateQueries({ queryKey: ["instructorCourse", id] });
+      invalidateStudentCourseCaches(queryClient);
     },
   });
 }
@@ -143,6 +157,7 @@ export function useDeleteCourseMutation() {
     mutationFn: (id: string) => instructorService.deleteCourse(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["instructorCourses"] });
+      invalidateStudentCourseCaches(queryClient);
     },
   });
 }

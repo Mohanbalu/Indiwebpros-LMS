@@ -630,7 +630,7 @@ function CoursesView({ data, isLoading, selectedCourseId, setSelectedCourseId, i
                 type="text"
                 value={courseForm.title}
                 onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-850 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                 placeholder="Advanced Full Stack Developer Pathway"
               />
               <span className={`text-[10px] font-bold block mt-1 ${
@@ -650,7 +650,7 @@ function CoursesView({ data, isLoading, selectedCourseId, setSelectedCourseId, i
                 rows={4}
                 value={courseForm.description}
                 onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-850 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                 placeholder="Provide a detailed roadmap explaining outcomes..."
               />
               <span className={`text-[10px] font-bold block mt-1 ${
@@ -670,7 +670,7 @@ function CoursesView({ data, isLoading, selectedCourseId, setSelectedCourseId, i
                 <select 
                   value={courseForm.categoryId}
                   onChange={(e) => setCourseForm({ ...courseForm, categoryId: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-850 text-xs focus:outline-none"
+                  className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs focus:outline-none"
                 >
                   <option value="">Select Category</option>
                   {categories?.data?.map((cat: any) => (
@@ -683,7 +683,7 @@ function CoursesView({ data, isLoading, selectedCourseId, setSelectedCourseId, i
                 <select 
                   value={courseForm.difficulty}
                   onChange={(e) => setCourseForm({ ...courseForm, difficulty: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-850 text-xs focus:outline-none"
+                  className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs focus:outline-none"
                 >
                   <option value="BEGINNER">Beginner</option>
                   <option value="INTERMEDIATE">Intermediate</option>
@@ -705,7 +705,7 @@ function CoursesView({ data, isLoading, selectedCourseId, setSelectedCourseId, i
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 font-medium">Configure one-time fee structures or free pathway enrollments.</p>
             </div>
 
-            <div className="flex items-center justify-between p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-855 select-none">
+            <div className="flex items-center justify-between p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-800 select-none">
               <div>
                 <span className="text-xs font-bold text-zinc-900 dark:text-white block">Free Pathway</span>
                 <span className="text-[10px] text-zinc-450 dark:text-zinc-550 block mt-0.5">Allow public access without charge</span>
@@ -725,7 +725,7 @@ function CoursesView({ data, isLoading, selectedCourseId, setSelectedCourseId, i
                   type="number"
                   value={courseForm.price}
                   onChange={(e) => setCourseForm({ ...courseForm, price: Number(e.target.value) })}
-                  className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-850 text-xs sm:text-sm focus:outline-none"
+                  className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs sm:text-sm focus:outline-none"
                   placeholder="199.00"
                 />
               </div>
@@ -863,7 +863,7 @@ function CoursesView({ data, isLoading, selectedCourseId, setSelectedCourseId, i
                     <div key={mod.id} className="rounded-2xl border border-zinc-150 dark:border-zinc-850 overflow-hidden bg-zinc-50/50 dark:bg-zinc-950/20">
                       
                       {/* Module Header row */}
-                      <div className="w-full p-4 flex items-center justify-between bg-zinc-100/50 dark:bg-zinc-900/50 border-b border-zinc-150 dark:border-zinc-855">
+                      <div className="w-full p-4 flex items-center justify-between bg-zinc-100/50 dark:bg-zinc-900/50 border-b border-zinc-150 dark:border-zinc-800">
                         {editingModuleId === mod.id ? (
                           <div className="flex-1 flex gap-2">
                             <input 
@@ -930,7 +930,7 @@ function CoursesView({ data, isLoading, selectedCourseId, setSelectedCourseId, i
                       {(activeModuleId === mod.id || activeCourseDetail.modules.length === 1) && (
                         <div className="p-4 bg-white dark:bg-zinc-900/50 space-y-3">
                           {mod.lessons?.map((les: any, lIdx: number) => (
-                            <div key={les.id} className="p-3 rounded-xl border border-zinc-150 dark:border-zinc-855 flex items-center justify-between bg-zinc-50/40 dark:bg-zinc-950/10">
+                            <div key={les.id} className="p-3 rounded-xl border border-zinc-150 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/40 dark:bg-zinc-950/10">
                               <div className="flex items-center gap-3">
                                 {les.lessonType === "PDF" ? (
                                   <FileText className="h-3.5 w-3.5 text-blue-500" />
@@ -1416,7 +1416,7 @@ function AssignmentsView({ data, isLoading, refetch }: any) {
             </div>
 
             {/* Mock Submission file render details */}
-            <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-855/80 space-y-3">
+            <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-800/80 space-y-3">
               <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider block">Submission content</span>
               <p className="text-xs text-zinc-800 dark:text-zinc-200 leading-relaxed font-medium">
                 "Here is my completed capstone build setup. The database pool resolves dynamic connections cleanly. I verified the schemas mapping constraints inside postgres."
@@ -1437,7 +1437,7 @@ function AssignmentsView({ data, isLoading, refetch }: any) {
                     type="number"
                     value={gradeScore}
                     onChange={(e) => setGradeScore(Number(e.target.value))}
-                    className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-850 text-xs sm:text-sm focus:outline-none"
+                    className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs sm:text-sm focus:outline-none"
                     min="0"
                     max="100"
                   />
@@ -1447,7 +1447,7 @@ function AssignmentsView({ data, isLoading, refetch }: any) {
                   <select 
                     value={statusVal}
                     onChange={(e) => setStatusVal(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-850 text-xs focus:outline-none"
+                    className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs focus:outline-none"
                   >
                     <option value="GRADED">Graded / Passed</option>
                     <option value="FAILED">Failed</option>
@@ -1462,7 +1462,7 @@ function AssignmentsView({ data, isLoading, refetch }: any) {
                   rows={4}
                   value={feedbackText}
                   onChange={(e) => setFeedbackText(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-850 text-xs sm:text-sm focus:outline-none"
+                  className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs sm:text-sm focus:outline-none"
                   placeholder="Provide guidance on optimizations, constraints schemas structures..."
                 />
               </div>
@@ -1570,7 +1570,7 @@ function QuizzesView({ data, isLoading, refetch }: any) {
               type="text"
               value={quizForm.title}
               onChange={(e) => setQuizForm({ ...quizForm, title: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-850 text-xs"
+              className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs"
               placeholder="Module 1 assessment..."
             />
           </div>
@@ -1580,7 +1580,7 @@ function QuizzesView({ data, isLoading, refetch }: any) {
               type="text"
               value={quizForm.description}
               onChange={(e) => setQuizForm({ ...quizForm, description: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-850 text-xs"
+              className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs"
               placeholder="Test understanding of connection pool limits..."
             />
           </div>
@@ -1619,7 +1619,7 @@ function QuizzesView({ data, isLoading, refetch }: any) {
               </div>
 
               {activeQuizId === quiz.id && (
-                <div className="mt-4 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-855 space-y-4">
+                <div className="mt-4 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-800 space-y-4">
                   <span className="text-[10px] font-bold text-zinc-450 uppercase tracking-widest block">Add Quiz Question</span>
                   
                   <div className="space-y-3">

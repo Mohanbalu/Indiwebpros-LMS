@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Play, Pause, Volume2, VolumeX, Maximize2, ShieldAlert, RotateCcw, RotateCw, Settings } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, Maximize2, ShieldAlert, RotateCcw, RotateCw, Gauge } from "lucide-react";
 
 const getBaseUrl = (url: string) => {
   if (!url) return "";
@@ -158,21 +158,11 @@ export function VideoPlayerPanel({
   };
 
   const handleSpeedChange = (rate: number) => {
-    console.log("Setting playbackRate to:", rate);
     if (videoRef.current) {
       videoRef.current.playbackRate = rate;
       setPlaybackSpeed(rate);
     }
     setShowSpeedMenu(false);
-  };
-
-  const handleRateChange = () => {
-    if (videoRef.current) {
-      console.log("onRateChange fired. Current rate in video tag:", videoRef.current.playbackRate, "Target:", playbackSpeed);
-      if (videoRef.current.playbackRate !== playbackSpeed) {
-        videoRef.current.playbackRate = playbackSpeed;
-      }
-    }
   };
 
   // Keep playback speed in sync with state
@@ -187,7 +177,6 @@ export function VideoPlayerPanel({
     if (!isPlaying) return;
     const interval = setInterval(() => {
       if (videoRef.current && videoRef.current.playbackRate !== playbackSpeed) {
-        console.log(`Interval Syncer: Restoring playback rate from ${videoRef.current.playbackRate} to ${playbackSpeed}`);
         videoRef.current.playbackRate = playbackSpeed;
       }
     }, 500);
@@ -262,7 +251,6 @@ export function VideoPlayerPanel({
             onLoadedMetadata={handleLoadedMetadata}
             onEnded={handleEnded}
             onClick={togglePlay}
-            onRateChange={handleRateChange}
             onDurationChange={() => {
               if (videoRef.current) {
                 const d = videoRef.current.duration;
@@ -365,31 +353,33 @@ export function VideoPlayerPanel({
 
               {/* Utility Settings & Fullscreen Controls */}
               <div className="flex items-center gap-5 relative">
-                {/* Playback Rate Speed Selector */}
+                {/* Playback Speed Selector */}
                 <div className="relative">
                   <button
                     onClick={() => setShowSpeedMenu(!showSpeedMenu)}
-                    className="flex items-center gap-1 text-[11px] font-black tracking-wider text-zinc-400 hover:text-white focus:outline-none bg-zinc-950/40 border border-zinc-800/80 px-2.5 py-1 rounded-xl transition"
-                    title="Playback speed"
+                    className="flex items-center gap-1.5 text-[11px] font-black tracking-wider text-zinc-400 hover:text-white focus:outline-none bg-zinc-950/40 border border-zinc-800/80 px-2.5 py-1 rounded-xl transition"
+                    title="Playback Speed"
                   >
-                    <Settings className="h-3.5 w-3.5" />
-                    <span>{playbackSpeed === 1 ? "Normal" : `${playbackSpeed}x`}</span>
+                    <Gauge className="h-3.5 w-3.5" />
+                    <span>{playbackSpeed === 1 ? "1x" : `${playbackSpeed}x`}</span>
                   </button>
 
                   {/* Playback Speed Menu */}
                   {showSpeedMenu && (
-                    <div className="absolute bottom-10 right-0 w-24 bg-zinc-950/95 backdrop-blur-md border border-zinc-800/80 rounded-2xl p-1.5 shadow-2xl flex flex-col gap-1 z-30 animate-fade-in max-h-48 overflow-y-auto">
-                      {[0.5, 1, 1.25, 1.5, 2].map((rate) => (
+                    <div className="absolute bottom-10 right-0 w-32 bg-zinc-950/95 backdrop-blur-md border border-zinc-800/80 rounded-2xl p-1.5 shadow-2xl z-30 animate-fade-in">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 px-2.5 pt-1 pb-1.5">Playback Speed</p>
+                      {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((rate) => (
                         <button
                           key={rate}
                           onClick={() => handleSpeedChange(rate)}
-                          className={`w-full py-1 text-[10px] font-extrabold rounded-lg text-center transition ${
+                          className={`w-full py-1.5 text-[11px] font-semibold rounded-lg text-center transition flex items-center justify-center gap-2 ${
                             playbackSpeed === rate
                               ? "bg-blue-600/20 text-blue-400"
                               : "text-zinc-400 hover:bg-zinc-800/30 hover:text-white"
                           }`}
                         >
                           {rate === 1 ? "Normal" : `${rate}x`}
+                          {playbackSpeed === rate && <span className="text-[8px]">✓</span>}
                         </button>
                       ))}
                     </div>

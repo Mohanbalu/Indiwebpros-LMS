@@ -1,0 +1,18 @@
+cd ~/Indiwebpros-LMS
+
+git pull
+
+# Backend
+cd backend
+pnpm build
+pm2 restart indiwebpros-api --update-env
+
+# Frontend
+cd ../frontend
+pnpm build
+
+sudo rm -rf /var/www/courses/*
+sudo cp -r dist/* /var/www/courses/
+sudo chown -R www-data:www-data /var/www/courses
+
+sudo systemctl reload nginx

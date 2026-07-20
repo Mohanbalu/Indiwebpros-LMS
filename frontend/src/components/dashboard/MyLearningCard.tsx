@@ -111,14 +111,14 @@ export const MyLearningCard = memo(function MyLearningCard({ courses, isLoading 
   if (isLoading) {
     return (
       <div className="rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 space-y-4">
-        <Skeleton className="h-5 w-28 bg-zinc-150 dark:bg-zinc-850" />
+        <Skeleton className="h-5 w-28 bg-zinc-150 dark:bg-zinc-900" />
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="flex gap-4 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/20 dark:bg-zinc-950/20">
               <Skeleton className="w-44 h-28 rounded-xl shrink-0 bg-zinc-150 dark:bg-zinc-800" />
               <div className="flex-1 space-y-3">
-                <Skeleton className="h-4 w-3/4 bg-zinc-200 dark:bg-zinc-850" />
-                <Skeleton className="h-3 w-1/2 bg-zinc-200 dark:bg-zinc-850" />
+                <Skeleton className="h-4 w-3/4 bg-zinc-200 dark:bg-zinc-900" />
+                <Skeleton className="h-3 w-1/2 bg-zinc-200 dark:bg-zinc-900" />
                 <Skeleton className="h-2 w-full max-w-xs rounded-full bg-zinc-150 dark:bg-zinc-800" />
               </div>
             </div>

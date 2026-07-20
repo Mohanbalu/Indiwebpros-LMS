@@ -99,14 +99,14 @@ export const ActivityFeed = memo(function ActivityFeed({ data, isLoading }: Acti
   if (isLoading) {
     return (
       <div className="rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 space-y-4">
-        <Skeleton className="h-5 w-24 bg-zinc-150 dark:bg-zinc-850" />
+        <Skeleton className="h-5 w-24 bg-zinc-150 dark:bg-zinc-900" />
         <div className="space-y-4">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="flex gap-3">
               <Skeleton className="h-8 w-8 rounded-full bg-zinc-150 dark:bg-zinc-800" />
               <div className="flex-1 space-y-2">
-                <Skeleton className="h-3.5 w-28 bg-zinc-200 dark:bg-zinc-850" />
-                <Skeleton className="h-3 w-36 bg-zinc-200 dark:bg-zinc-850" />
+                <Skeleton className="h-3.5 w-28 bg-zinc-200 dark:bg-zinc-900" />
+                <Skeleton className="h-3 w-36 bg-zinc-200 dark:bg-zinc-900" />
               </div>
             </div>
           ))}

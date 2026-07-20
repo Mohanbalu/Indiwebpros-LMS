@@ -33,8 +33,8 @@ export const AchievementsSection = memo(function AchievementsSection({
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="p-3 rounded-xl border border-zinc-150 dark:border-zinc-800 text-center">
               <Skeleton className="h-8 w-8 rounded-full mx-auto bg-zinc-150 dark:bg-zinc-800" />
-              <Skeleton className="mt-1.5 h-5 w-10 mx-auto bg-zinc-200 dark:bg-zinc-850" />
-              <Skeleton className="mt-0.5 h-3 w-16 mx-auto bg-zinc-200 dark:bg-zinc-850" />
+              <Skeleton className="mt-1.5 h-5 w-10 mx-auto bg-zinc-200 dark:bg-zinc-900" />
+              <Skeleton className="mt-0.5 h-3 w-16 mx-auto bg-zinc-200 dark:bg-zinc-900" />
             </div>
           ))}
         </div>

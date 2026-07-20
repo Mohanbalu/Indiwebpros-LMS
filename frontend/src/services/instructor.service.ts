@@ -13,8 +13,8 @@ export const instructorService = {
   
   // Course actions
   createCourse: (data: any) => api.post("/courses", data),
-  updateCourse: (id: string, data: any) => api.put(`/courses/${id}`, data),
-  publishCourse: (id: string) => api.patch(`/courses/${id}/publish`),
+  updateCourse: (id: string, data: any) => api.put(`/courses/${id}`, data, { timeout: 60000 }),
+  publishCourse: (id: string) => api.patch(`/courses/${id}/publish`, {}, { timeout: 60000 }),
   archiveCourse: (id: string) => api.patch(`/courses/${id}/archive`),
   duplicateCourse: (id: string) => api.post(`/courses/${id}/duplicate`),
   deleteCourse: (id: string) => api.delete(`/courses/${id}`),
