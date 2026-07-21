@@ -240,6 +240,114 @@ export class PaymentService {
     if (!payment) throw new NotFoundError("Payment not found");
     return payment;
   }
+
+  async getPaymentHistory(
+    userId: string,
+    page: number = 1,
+    limit: number = 20
+  ): Promise<{ data: any[]; total: number; page: number; limit: number; totalPages: number }> {
+    const skip = (page - 1) * limit;
+
+    const [payments, total] = await prisma.$transaction([
+      prisma.payment.findMany({
+        where: { userId },
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+        include: {
+          course: {
+            include: {
+              instructor: { select: { id: true, firstName: true, lastName: true } },
+              thumbnail: { select: { url: true } },
+            },
+          },
+          couponUsages: {
+            include: {
+              coupon: {
+                select: { code: true, discountType: true, discountValue: true },
+              },
+            },
+          },
+        },
+      }),
+      prisma.payment.count({ where: { userId } }),
+    ]);
+
+    return {
+      data: payments.map((p) => ({
+        ...p,
+        amount: p.amount.toNumber(),
+        discount: p.discount.toNumber(),
+        tax: p.tax.toNumber(),
+        finalAmount: p.finalAmount.toNumber(),
+        course: {
+          ...p.course,
+          instructor: p.course.instructor,
+          thumbnail: p.course.thumbnail,
+          price: p.course.price.toNumber(),
+          discountPrice: p.course.discountPrice?.toNumber() ?? null,
+        },
+        couponUsages: p.couponUsages.map((cu) => ({
+          ...cu,
+          coupon: {
+            ...cu.coupon,
+            discountValue: cu.coupon.discountValue.toNumber(),
+          },
+        })),
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getInvoiceData(paymentId: string, userId: string): Promise<any> {
+    const payment = await prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        course: { select: { id: true, title: true, slug: true } },
+        user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
+        couponUsages: {
+          include: { coupon: { select: { code: true } } },
+        },
+      },
+    });
+
+    if (!payment) throw new NotFoundError("Payment not found");
+    if (payment.userId !== userId) throw new NotFoundError("Payment not found");
+
+    const metadata = payment.metadata as Record<string, any> | null;
+    const razorpayPaymentId = metadata?.razorpayPaymentId || null;
+    // Generate invoice number from payment ID (last 8 chars uppercased)
+    const invoiceNumber = `INV-${payment.id.replace(/-/g, "").slice(-8).toUpperCase()}`;
+
+    return {
+      invoiceNumber,
+      paymentId: payment.id,
+      transactionId: payment.transactionId,
+      razorpayPaymentId,
+      status: payment.status,
+      paidAt: payment.paidAt?.toISOString() ?? null,
+      createdAt: payment.createdAt.toISOString(),
+      amount: payment.amount.toNumber(),
+      discount: payment.discount.toNumber(),
+      tax: payment.tax.toNumber(),
+      finalAmount: payment.finalAmount.toNumber(),
+      currency: payment.currency,
+      paymentMethod: payment.paymentMethod,
+      couponCode: payment.couponUsages[0]?.coupon?.code ?? null,
+      course: payment.course,
+      student: payment.user,
+      company: {
+        name: "IndiWebPros Learning Pvt. Ltd.",
+        email: "admin@indiwebpros.in",
+        website: "https://www.indiwebpros.in",
+        gstin: "N/A",
+        address: "India",
+      },
+    };
+  }
 }
 
 export const paymentService = new PaymentService();

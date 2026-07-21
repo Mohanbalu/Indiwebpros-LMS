@@ -271,6 +271,27 @@ export class PurchaseController {
     } catch (e) { next(e); }
   }
 
+  static async getPaymentHistory(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user!.userId;
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
+
+      const result = await paymentService.getPaymentHistory(userId, page, limit);
+      res.json({ success: true, ...result });
+    } catch (e) { next(e); }
+  }
+
+  static async getInvoice(req: Request, res: Response, next: NextFunction) {
+    try {
+      const paymentId = req.params.id as string;
+      const userId = req.user!.userId;
+
+      const invoice = await paymentService.getInvoiceData(paymentId, userId);
+      res.json({ success: true, data: invoice });
+    } catch (e) { next(e); }
+  }
+
   static async validateCoupon(req: Request, res: Response, next: NextFunction) {
     try {
       const parsed = validateCouponSchema.safeParse(req.body);

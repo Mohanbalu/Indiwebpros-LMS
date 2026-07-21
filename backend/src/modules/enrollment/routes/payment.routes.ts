@@ -46,6 +46,12 @@ router.post("/verify", authGuard, rl, PurchaseController.verifyPayment);
 /** POST /payments/refund      → Admin-only refund */
 router.post("/refund", authGuard, authorize(["Admin"]), rl, PurchaseController.refundPayment);
 
+/** GET  /payments/history     → Student's own payment history */
+router.get("/history", authGuard, rl, PurchaseController.getPaymentHistory);
+
+/** GET  /payments/invoice/:id → Invoice data for a payment */
+router.get("/invoice/:id", authGuard, rl, PurchaseController.getInvoice);
+
 /** GET  /payments/:id         → Get payment details */
 router.get("/:id", authGuard, rl, PurchaseController.getPaymentDetails);
 

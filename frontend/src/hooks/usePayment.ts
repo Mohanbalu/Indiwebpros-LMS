@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { paymentService, VerifyPaymentPayload } from "@/services/payment.service";
+import { paymentService } from "@/services/payment.service";
 import { extractErrorMessage } from "@/types/api.types";
+import type { CouponValidationResult, VerifyPaymentPayload } from "@/types/payment.types";
 
 export type PaymentState =
   | "idle"
@@ -17,6 +18,10 @@ export function usePayment() {
   const queryClient = useQueryClient();
   const [paymentState, setPaymentState] = useState<PaymentState>("idle");
   const [errorMsg, setErrorMsg] = useState<string>("");
+  const [couponData, setCouponData] = useState<CouponValidationResult | null>(null);
+  const [couponError, setCouponError] = useState<string>("");
+
+  // ── Create Order ────────────────────────────────────────────
 
   const createOrderMutation = useMutation({
     mutationFn: ({ courseId, couponCode }: { courseId: string; couponCode?: string }) =>
@@ -31,6 +36,8 @@ export function usePayment() {
     },
   });
 
+  // ── Verify Payment ──────────────────────────────────────────
+
   const verifyPaymentMutation = useMutation({
     mutationFn: (payload: VerifyPaymentPayload) =>
       paymentService.verifyRazorpayPayment(payload),
@@ -42,12 +49,15 @@ export function usePayment() {
       queryClient.invalidateQueries({ queryKey: ["enrollments"] });
       queryClient.invalidateQueries({ queryKey: ["my-courses"] });
       queryClient.invalidateQueries({ queryKey: ["courses"] });
+      queryClient.invalidateQueries({ queryKey: ["payment-history"] });
     },
     onError: (err) => {
       setPaymentState("verification_failed");
       setErrorMsg(extractErrorMessage(err, "Payment verification failed"));
     },
   });
+
+  // ── Free Enrollment ─────────────────────────────────────────
 
   const enrollFreeMutation = useMutation({
     mutationFn: ({ courseId, couponCode }: { courseId: string; couponCode?: string }) =>
@@ -68,15 +78,45 @@ export function usePayment() {
     },
   });
 
+  // ── Coupon Validation ───────────────────────────────────────
+
+  const validateCouponMutation = useMutation({
+    mutationFn: ({ code, courseId }: { code: string; courseId: string }) =>
+      paymentService.validateCoupon(code, courseId),
+    onMutate: () => {
+      setCouponError("");
+    },
+    onSuccess: (res) => {
+      setCouponData(res.data);
+      setCouponError("");
+    },
+    onError: (err) => {
+      setCouponData(null);
+      setCouponError(extractErrorMessage(err, "Invalid coupon code"));
+    },
+  });
+
+  const removeCoupon = () => {
+    setCouponData(null);
+    setCouponError("");
+  };
+
   return {
     paymentState,
     setPaymentState,
     errorMsg,
+    setErrorMsg,
     createOrder: createOrderMutation.mutateAsync,
     isCreatingOrder: createOrderMutation.isPending,
     verifyPayment: verifyPaymentMutation.mutateAsync,
     isVerifying: verifyPaymentMutation.isPending,
     enrollFree: enrollFreeMutation.mutateAsync,
     isEnrollingFree: enrollFreeMutation.isPending,
+    // Coupon
+    validateCoupon: validateCouponMutation.mutateAsync,
+    isValidatingCoupon: validateCouponMutation.isPending,
+    couponData,
+    couponError,
+    removeCoupon,
   };
 }

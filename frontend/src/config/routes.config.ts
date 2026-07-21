@@ -24,6 +24,7 @@ export const ROUTES = {
   checkout: "/payments/checkout",
   paymentSuccess: "/payments/success",
   paymentFailure: "/payments/failure",
+  myPayments: "/payments/history",
   player: "/player/course",
   quiz: "/player/quiz",
   certificates: "/certificates",

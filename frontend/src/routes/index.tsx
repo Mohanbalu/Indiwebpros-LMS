@@ -40,6 +40,7 @@ const QuizPage = lazy(() => import("@/pages/QuizPage"));
 const MyCertificates = lazy(() => import("@/pages/MyCertificates"));
 const CertificateDetail = lazy(() => import("@/pages/CertificateDetail"));
 const CertificateVerify = lazy(() => import("@/pages/CertificateVerify"));
+const MyPayments = lazy(() => import("@/pages/MyPayments"));
 
 // Reusable Suspense wrapper (Route Loader)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -85,6 +86,7 @@ const QuizPageLoadable = Loadable(QuizPage);
 const MyCertificatesLoadable = Loadable(MyCertificates);
 const CertificateDetailLoadable = Loadable(CertificateDetail);
 const CertificateVerifyLoadable = Loadable(CertificateVerify);
+const MyPaymentsLoadable = Loadable(MyPayments);
 
 export function AppRoutes() {
   const { user, loading } = useAuth();
@@ -143,6 +145,7 @@ export function AppRoutes() {
           { path: ROUTES.checkout, element: <CheckoutLoadable /> },
           { path: ROUTES.paymentSuccess, element: <PaymentSuccessLoadable /> },
           { path: ROUTES.paymentFailure, element: <PaymentFailureLoadable /> },
+          { path: ROUTES.myPayments, element: <MyPaymentsLoadable /> },
 
           // Auth pages redirect back to dashboard if logged in
           {

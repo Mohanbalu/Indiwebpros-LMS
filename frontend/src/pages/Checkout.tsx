@@ -1,12 +1,18 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, CreditCard, ShieldCheck, AlertCircle, Loader2 } from "lucide-react";
+import {
+  ArrowLeft, CreditCard, ShieldCheck, AlertCircle, Loader2,
+  BookOpen, Clock, Globe, Award, CheckSquare,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/services/api";
 import { ROUTES } from "@/config/routes.config";
 import { useAuth } from "@/context/AuthContext";
 import { usePayment } from "@/hooks/usePayment";
+import { CouponInput } from "@/components/payment/CouponInput";
+import { OrderSummaryCard, computeFinalAmount } from "@/components/payment/OrderSummaryCard";
 
 interface RazorpayInstance {
   open(): void;
@@ -19,7 +25,7 @@ interface RazorpayOptions {
   name: string;
   description: string;
   order_id: string;
-  prefill: { name: string; email: string };
+  prefill: { name: string; email: string; contact?: string };
   theme: { color: string };
   handler(response: Record<string, string>): void;
   modal: { ondismiss(): void };
@@ -32,10 +38,7 @@ interface RazorpayWindow {
 function loadRazorpayScript(): Promise<boolean> {
   return new Promise((resolve) => {
     const rzp = (window as unknown as RazorpayWindow).Razorpay;
-    if (rzp) {
-      resolve(true);
-      return;
-    }
+    if (rzp) { resolve(true); return; }
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.onload = () => resolve(true);
@@ -44,22 +47,44 @@ function loadRazorpayScript(): Promise<boolean> {
   });
 }
 
+function CheckoutSkeleton() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-blue-50/20 to-zinc-50 dark:from-zinc-950 dark:via-blue-950/10 dark:to-zinc-950 py-12 px-6">
+      <div className="mx-auto max-w-xl space-y-4 animate-pulse">
+        <div className="h-8 w-32 bg-zinc-200 dark:bg-zinc-700 rounded-lg" />
+        <div className="h-48 w-full bg-zinc-200 dark:bg-zinc-700 rounded-2xl" />
+        <div className="h-64 w-full bg-zinc-200 dark:bg-zinc-700 rounded-2xl" />
+      </div>
+    </div>
+  );
+}
+
 export default function Checkout() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const courseId = searchParams.get("courseId");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+
+  const razorpayKeyId = import.meta.env.VITE_RAZORPAY_KEY_ID as string;
 
   const {
     paymentState,
     setPaymentState,
     errorMsg,
+    setErrorMsg,
     createOrder,
     verifyPayment,
+    enrollFree,
+    validateCoupon,
+    isValidatingCoupon,
+    couponData,
+    couponError,
+    removeCoupon,
   } = usePayment();
 
-  // Query to fetch Course details
-  const { data: courseRes, isLoading: courseLoading } = useQuery({
+  // Fetch course details
+  const { data: courseRes, isLoading: courseLoading, isError: courseError } = useQuery({
     queryKey: ["checkoutCourse", courseId],
     queryFn: async () => {
       const res = await api.get(`/courses/${courseId}`);
@@ -71,224 +96,320 @@ export default function Checkout() {
   const course = courseRes?.success ? courseRes.data : null;
 
   useEffect(() => {
-    if (!courseId) {
-      navigate(ROUTES.courses);
-    }
+    if (!courseId) navigate(ROUTES.courses);
   }, [courseId, navigate]);
 
-  const handlePayment = async () => {
+  const basePrice = course?.price ?? 0;
+  const isFree = basePrice === 0;
+  const finalAmount = computeFinalAmount(basePrice, couponData);
+
+  const handleFreeEnrollment = async () => {
     try {
-      const orderRes = await createOrder({ courseId: courseId! });
+      await enrollFree({ courseId: courseId!, couponCode: couponData?.code });
+      navigate(`${ROUTES.paymentSuccess}?courseName=${encodeURIComponent(course?.title || "")}&courseId=${course?.id}&isFree=true`);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Enrollment failed");
+    }
+  };
+
+  const handlePayment = async () => {
+    if (!agreedToTerms) {
+      setErrorMsg("Please agree to the Terms & Conditions to proceed.");
+      return;
+    }
+    try {
+      const orderRes = await createOrder({ courseId: courseId!, couponCode: couponData?.code });
       if (!orderRes.success || !orderRes.payment) {
         throw new Error("Failed to initialize payment record");
       }
-
       const { payment } = orderRes;
 
       setPaymentState("opening_razorpay");
-
       const scriptLoaded = await loadRazorpayScript();
-      if (!scriptLoaded) {
-        throw new Error("Razorpay Checkout SDK failed to load. Please check your connection.");
-      }
+      if (!scriptLoaded) throw new Error("Razorpay SDK failed to load. Please check your internet connection.");
 
       const Razorpay = (window as unknown as RazorpayWindow).Razorpay;
-      if (!Razorpay) {
-        throw new Error("Razorpay SDK not available");
-      }
+      if (!Razorpay) throw new Error("Razorpay SDK not available");
+
+      // Use the Razorpay order ID from metadata (provider order ID)
+      const rzpOrderId = (payment.metadata as any)?.razorpayOrderId || payment.id;
 
       const rzp = new Razorpay({
-        key: "",
-        amount: payment.finalAmount,
+        key: razorpayKeyId,
+        amount: Math.round(finalAmount * 100), // paise
         currency: payment.currency || "INR",
         name: "IndiWebPros LMS",
         description: course?.title || "Course Access Payment",
-        order_id: payment.id,
+        order_id: rzpOrderId,
         prefill: {
           name: `${user?.firstName || ""} ${user?.lastName || ""}`.trim(),
           email: user?.email || "",
         },
         theme: { color: "#3B82F6" },
         handler: async (response) => {
-          await verifyPayment({
-            paymentId: payment.id,
-            razorpay_order_id: response.razorpay_order_id,
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_signature: response.razorpay_signature,
-          });
-
-          navigate(
-            `${ROUTES.paymentSuccess}?courseName=${encodeURIComponent(
-              course?.title || ""
-            )}&transactionId=${response.razorpay_payment_id}&courseId=${course?.id}`
-          );
+          try {
+            await verifyPayment({
+              paymentId: payment.id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            navigate(
+              `${ROUTES.paymentSuccess}?courseName=${encodeURIComponent(course?.title || "")}&courseId=${course?.id}&paymentId=${payment.id}&transactionId=${response.razorpay_payment_id}`
+            );
+          } catch (err) {
+            navigate(
+              `${ROUTES.paymentFailure}?reason=${encodeURIComponent(err instanceof Error ? err.message : "Payment verification failed")}&courseId=${courseId}`
+            );
+          }
         },
         modal: {
-          ondismiss: () => {},
+          ondismiss: () => {
+            setPaymentState("payment_cancelled");
+          },
         },
       });
 
       rzp.open();
     } catch (err) {
       navigate(
-        `${ROUTES.paymentFailure}?error=${encodeURIComponent(
-          err instanceof Error ? err.message : "Payment setup failed"
-        )}`
+        `${ROUTES.paymentFailure}?reason=${encodeURIComponent(err instanceof Error ? err.message : "Payment setup failed")}&courseId=${courseId}`
       );
     }
   };
 
-  const handleSimulatedMockSuccess = async () => {
-    try {
-      const orderRes = await api.post("/purchases", { courseId, provider: "MOCK" });
-      if (!orderRes.data?.success || !orderRes.data?.payment) {
-        throw new Error("Failed to initialize mock payment record");
-      }
+  if (courseLoading) return <CheckoutSkeleton />;
 
-      const { payment } = orderRes.data;
-
-      const verifyRes = await api.post("/payments/mock", {
-        paymentId: payment.id,
-        status: "SUCCESS",
-        paymentMethod: "MOCK_CARD",
-      });
-
-      if (verifyRes.data?.success) {
-        navigate(
-          `${ROUTES.paymentSuccess}?courseName=${encodeURIComponent(
-            course?.title || ""
-          )}&transactionId=${verifyRes.data.data?.transactionId || "mock-tx-123"}&courseId=${course?.id}`
-        );
-      } else {
-        throw new Error("Mock verification failed");
-      }
-    } catch (err) {
-      navigate(
-        `${ROUTES.paymentFailure}?error=${encodeURIComponent(
-          err instanceof Error ? err.message : "Simulated payment failed"
-        )}`
-      );
-    }
-  };
-
-  if (courseLoading || !course) {
+  if (courseError || !course) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-        <span className="mt-4 text-sm font-semibold text-zinc-500 dark:text-zinc-400">
-          Loading checkout gateway details...
-        </span>
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center p-6">
+        <div className="text-center space-y-4 max-w-sm">
+          <div className="h-16 w-16 rounded-2xl bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center mx-auto text-2xl">⚠️</div>
+          <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">Course not found</h2>
+          <p className="text-sm text-zinc-500">We couldn't load the course details. Please try again.</p>
+          <Link to={ROUTES.courses}>
+            <Button className="w-full mt-2">Browse Courses</Button>
+          </Link>
+        </div>
       </div>
     );
   }
 
-  const basePrice = course.price;
-  const finalPrice = course.price;
+  const isProcessing =
+    paymentState === "creating_order" ||
+    paymentState === "opening_razorpay" ||
+    paymentState === "payment_processing";
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 py-12 px-6">
-      <div className="mx-auto max-w-2xl bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/80 rounded-3xl p-8 shadow-sm">
+    <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-blue-50/30 to-zinc-50 dark:from-zinc-950 dark:via-blue-950/10 dark:to-zinc-950 py-12 px-6">
+      <div className="mx-auto max-w-xl">
+
+        {/* Back */}
         <Link
           to={`/courses/${course.slug}`}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-450 hover:text-zinc-700 dark:hover:text-zinc-300 mb-8"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 mb-6 transition-colors group"
         >
-          <ArrowLeft className="h-4 w-4" /> Return to catalog
+          <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+          Back to Course
         </Link>
 
-        <h1 className="text-2xl font-black text-zinc-900 dark:text-zinc-50 mb-6">Checkout Summary</h1>
-
-        {/* Course Line Item Info */}
-        <div className="flex items-start gap-4 p-4 border border-zinc-200/50 dark:border-zinc-800/80 rounded-2xl mb-8 bg-zinc-50/50 dark:bg-zinc-900/10">
-          <div className="h-16 w-24 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex-shrink-0 flex items-center justify-center font-bold text-blue-600 dark:text-blue-400 text-xs">
-            Course Title
+        {/* Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
+          className="bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 rounded-3xl shadow-xl shadow-zinc-100/80 dark:shadow-zinc-950/60 overflow-hidden"
+        >
+          {/* Course Banner */}
+          <div className="relative">
+            {course.thumbnail?.url ? (
+              <img
+                src={course.thumbnail.url}
+                alt={course.title}
+                className="w-full h-40 object-cover"
+              />
+            ) : (
+              <div className="w-full h-40 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 flex items-center justify-center">
+                <BookOpen className="h-12 w-12 text-white/60" />
+              </div>
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+            <div className="absolute bottom-4 left-5 right-5">
+              <h1 className="text-lg font-black text-white leading-tight line-clamp-2">{course.title}</h1>
+              {course.instructor && (
+                <p className="text-xs text-white/75 mt-1 font-medium">
+                  by {course.instructor.firstName} {course.instructor.lastName}
+                </p>
+              )}
+            </div>
           </div>
-          <div>
-            <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-50 line-clamp-1">
-              {course.title}
-            </h2>
-            <p className="text-xs text-zinc-450 mt-1 line-clamp-2">
-              {course.description}
-            </p>
-          </div>
-        </div>
 
-        {/* Pricing break downs */}
-        <div className="space-y-3 text-xs border-b border-zinc-200/50 dark:border-zinc-800/80 pb-6 mb-6">
-          <div className="flex justify-between text-zinc-500">
-            <span>Course Access Fee</span>
-            <span className="font-semibold">₹{basePrice}</span>
+          {/* Course Meta badges */}
+          <div className="flex items-center gap-4 px-6 py-3 bg-zinc-50/70 dark:bg-zinc-800/40 border-b border-zinc-100 dark:border-zinc-800/60 overflow-x-auto">
+            {course.durationMinutes > 0 && (
+              <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
+                <Clock className="h-3.5 w-3.5 text-blue-500" />
+                {Math.round(course.durationMinutes / 60)}h content
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
+              <Globe className="h-3.5 w-3.5 text-blue-500" />
+              {course.language || "English"}
+            </div>
+            {course.certificateEnabled && (
+              <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
+                <Award className="h-3.5 w-3.5 text-yellow-500" />
+                Certificate
+              </div>
+            )}
           </div>
-          <div className="flex justify-between text-zinc-500">
-            <span>Tax (GST)</span>
-            <span className="font-semibold">₹0.00</span>
+
+          {/* Body */}
+          <div className="p-6 space-y-6">
+
+            {/* Coupon */}
+            {!isFree && (
+              <CouponInput
+                courseId={courseId!}
+                onValidate={validateCoupon}
+                onRemove={removeCoupon}
+                couponData={couponData}
+                couponError={couponError}
+                isLoading={isValidatingCoupon}
+              />
+            )}
+
+            {/* Price Breakdown */}
+            <div className="p-4 rounded-2xl bg-zinc-50/70 dark:bg-zinc-800/40 border border-zinc-100/80 dark:border-zinc-700/50">
+              <h3 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-4">
+                Order Summary
+              </h3>
+              {isFree ? (
+                <div className="text-center py-2">
+                  <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400">FREE</span>
+                  <p className="text-xs text-zinc-500 mt-1">This course is available at no cost</p>
+                </div>
+              ) : (
+                <OrderSummaryCard
+                  basePrice={basePrice}
+                  couponData={couponData}
+                  gstRate={0}
+                  currency={course.currency || "INR"}
+                />
+              )}
+            </div>
+
+            {/* Error */}
+            <AnimatePresence>
+              {errorMsg && (
+                <motion.div
+                  key="error"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="flex gap-2.5 p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 text-xs font-semibold"
+                >
+                  <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                  {errorMsg}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Status Indicator */}
+            <AnimatePresence>
+              {isProcessing && (
+                <motion.div
+                  key="processing"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-2.5 p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-semibold"
+                >
+                  <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                  <span>
+                    {paymentState === "creating_order" && "Creating secure order on servers..."}
+                    {paymentState === "opening_razorpay" && "Loading secure Razorpay checkout..."}
+                    {paymentState === "payment_processing" && "Verifying your payment..."}
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Terms */}
+            {!isFree && (
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <div className="relative mt-0.5">
+                  <input
+                    type="checkbox"
+                    checked={agreedToTerms}
+                    onChange={(e) => {
+                      setAgreedToTerms(e.target.checked);
+                      if (e.target.checked && errorMsg.includes("Terms")) setErrorMsg("");
+                    }}
+                    className="sr-only"
+                  />
+                  <div
+                    className={`h-4.5 w-4.5 rounded-[5px] border-2 flex items-center justify-center transition-all duration-200 ${
+                      agreedToTerms
+                        ? "bg-blue-600 border-blue-600"
+                        : "border-zinc-300 dark:border-zinc-600 group-hover:border-blue-400"
+                    }`}
+                    style={{ height: "18px", width: "18px" }}
+                  >
+                    {agreedToTerms && <CheckSquare className="h-3 w-3 text-white" />}
+                  </div>
+                </div>
+                <span className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                  I agree to the{" "}
+                  <Link to={ROUTES.terms} className="text-blue-600 dark:text-blue-400 underline" target="_blank">
+                    Terms of Service
+                  </Link>{" "}
+                  and{" "}
+                  <Link to={ROUTES.refund} className="text-blue-600 dark:text-blue-400 underline" target="_blank">
+                    Refund Policy
+                  </Link>
+                </span>
+              </label>
+            )}
+
+            {/* CTA Buttons */}
+            {isFree ? (
+              <Button
+                id="enroll-free-btn"
+                onClick={handleFreeEnrollment}
+                className="w-full flex items-center justify-center gap-2"
+                size="lg"
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <><Loader2 className="h-5 w-5 animate-spin" /> Enrolling...</>
+                ) : (
+                  <><BookOpen className="h-5 w-5" /> Enroll for Free</>
+                )}
+              </Button>
+            ) : (
+              <Button
+                id="pay-with-razorpay-btn"
+                onClick={handlePayment}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 transition-all duration-300"
+                size="lg"
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <><Loader2 className="h-5 w-5 animate-spin" /> Processing...</>
+                ) : (
+                  <><CreditCard className="h-5 w-5" /> Pay ₹{finalAmount.toFixed(2)} with Razorpay</>
+                )}
+              </Button>
+            )}
+
+            {/* Security Badge */}
+            <div className="flex items-center justify-center gap-2 text-[11px] text-zinc-400 dark:text-zinc-500 font-semibold">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+              256-bit SSL encrypted · Secured by Razorpay
+            </div>
           </div>
-          <div className="flex justify-between text-zinc-500">
-            <span>Platform Discount</span>
-            <span className="font-semibold text-green-600">-₹0.00</span>
-          </div>
-        </div>
-
-        <div className="flex justify-between text-sm font-bold mb-8 text-zinc-900 dark:text-zinc-50">
-          <span>Order Total</span>
-          <span className="text-lg font-black">₹{finalPrice}</span>
-        </div>
-
-        {/* Error Display */}
-        {errorMsg && (
-          <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-xs font-semibold flex gap-2 mb-6">
-            <AlertCircle className="h-4 w-4 flex-shrink-0" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
-
-        {/* State Indicators */}
-        {paymentState !== "idle" && paymentState !== "payment_cancelled" && (
-          <div className="flex items-center gap-2.5 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-100/50 dark:border-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-semibold mb-6">
-            <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
-            <span>
-              {paymentState === "creating_order" && "Creating order record on servers..."}
-              {paymentState === "opening_razorpay" && "Loading secure checkout window..."}
-              {paymentState === "payment_processing" && "Processing transaction details..."}
-            </span>
-          </div>
-        )}
-
-        {/* Submit Actions */}
-        <div className="space-y-4">
-          <Button
-            onClick={handlePayment}
-            className="w-full flex items-center justify-center gap-2"
-            size="lg"
-            disabled={
-              paymentState === "creating_order" ||
-              paymentState === "opening_razorpay" ||
-              paymentState === "payment_processing"
-            }
-          >
-            <CreditCard className="h-5 w-5" /> Pay with Razorpay
-          </Button>
-
-          {/* simulated test success trigger for headless environments */}
-          {process.env.NODE_ENV !== "production" && (
-            <Button
-              onClick={handleSimulatedMockSuccess}
-              variant="outline"
-              className="w-full simulate-rzp-payment-success-btn"
-              size="lg"
-              disabled={
-                paymentState === "creating_order" ||
-                paymentState === "opening_razorpay" ||
-                paymentState === "payment_processing"
-              }
-            >
-              Simulate Payment Success (E2E)
-            </Button>
-          )}
-
-          <div className="flex items-center justify-center gap-1 text-[10px] text-zinc-400 dark:text-zinc-500 font-semibold mt-4">
-            <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> Secure 256-bit SSL encrypted connection
-          </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );
