@@ -85,7 +85,8 @@ export class PaymentService {
     const isFree = finalAmount === 0;
 
     // 4. Create Payment record and process
-    return prisma.$transaction(async (tx) => {
+    // Only database writes inside the transaction — no audit, notifications, or emails.
+    const txResult = await prisma.$transaction(async (tx) => {
       const payment = await tx.payment.create({
         data: {
           userId,
@@ -103,23 +104,16 @@ export class PaymentService {
       });
 
       if (isFree) {
-        // Create CouponUsage if discount was applied
         if (couponId) {
           await tx.couponUsage.create({
-            data: {
-              couponId,
-              userId,
-              paymentId: payment.id,
-            },
+            data: { couponId, userId, paymentId: payment.id },
           });
-          // Update Coupon usedCount
           await tx.coupon.update({
             where: { id: couponId },
             data: { usedCount: { increment: 1 } },
           });
         }
 
-        // Create active Enrollment immediately for free courses
         const enrollment = await tx.enrollment.create({
           data: {
             userId,
@@ -131,55 +125,7 @@ export class PaymentService {
           },
         });
 
-        // Audit & notifications
-        try {
-          await ServiceContainer.audit.log({
-            userId,
-            action: "PAYMENT_CREATED",
-            resource: "Payment",
-            resourceId: payment.id,
-            details: { amount: 0, isFree: true },
-            status: "SUCCESS",
-          });
-          await ServiceContainer.audit.log({
-            userId,
-            action: "ENROLLMENT_CREATED",
-            resource: "Enrollment",
-            resourceId: enrollment.id,
-            details: { accessType: AccessType.LIFETIME },
-            status: "SUCCESS",
-          });
-          await ServiceContainer.audit.log({
-            userId,
-            action: "ENROLLMENT_ACTIVATED",
-            resource: "Enrollment",
-            resourceId: enrollment.id,
-            details: {},
-            status: "SUCCESS",
-          });
-
-          // Dispatch notifications
-          await ServiceContainer.notification.create({
-            userId,
-            title: "Course Activated! 📚",
-            message: `Your access to the course "${course.title}" has been successfully activated.`,
-            type: "ENROLLMENT" as any,
-            priority: "HIGH" as any,
-          });
-
-          // Send Email
-          const userEmail = (await tx.user.findUnique({ where: { id: userId } }))!.email;
-          await ServiceContainer.email.send(
-            userEmail,
-            `Enrollment Confirmation: ${course.title}`,
-            `<p>Welcome! Your access to the course <b>${course.title}</b> has been successfully activated. Start learning today!</p>`
-          );
-        } catch (err) {
-          // Log notification failure but do not roll back transaction
-          ServiceContainer.logger.error(`Notification/Email dispatch failed for free course enrollment: ${err}`);
-        }
-
-        return { payment, isFree: true };
+        return { payment, enrollmentId: enrollment.id, isFree: true as const };
       }
 
       // Paid course flow: Call Payment Provider
@@ -191,7 +137,6 @@ export class PaymentService {
         course: { title: course.title },
       });
 
-      // Update payment with providerPaymentId (transactionId)
       const updatedPayment = await tx.payment.update({
         where: { id: payment.id },
         data: {
@@ -201,7 +146,6 @@ export class PaymentService {
         },
       });
 
-      // Create PaymentAttempt record
       await tx.paymentAttempt.create({
         data: {
           paymentId: payment.id,
@@ -212,24 +156,74 @@ export class PaymentService {
         },
       });
 
-      // Log Payment Created Audit
+      return {
+        payment: updatedPayment,
+        approvalUrl: providerRes.approvalUrl,
+        isFree: false as const,
+      };
+    });
+
+    // Audit logs, notifications, and emails — all AFTER transaction commits
+    if (txResult.isFree) {
       try {
         await ServiceContainer.audit.log({
           userId,
           action: "PAYMENT_CREATED",
           resource: "Payment",
-          resourceId: payment.id,
-          details: { amount: finalAmount, providerPaymentId: providerRes.providerPaymentId },
+          resourceId: txResult.payment.id,
+          details: { amount: 0, isFree: true },
           status: "SUCCESS",
         });
-      } catch {}
+        await ServiceContainer.audit.log({
+          userId,
+          action: "ENROLLMENT_CREATED",
+          resource: "Enrollment",
+          resourceId: txResult.enrollmentId,
+          details: { accessType: AccessType.LIFETIME },
+          status: "SUCCESS",
+        });
+        await ServiceContainer.audit.log({
+          userId,
+          action: "ENROLLMENT_ACTIVATED",
+          resource: "Enrollment",
+          resourceId: txResult.enrollmentId,
+          details: {},
+          status: "SUCCESS",
+        });
 
-      return {
-        payment: updatedPayment,
-        approvalUrl: providerRes.approvalUrl,
-        isFree: false,
-      };
-    });
+        await ServiceContainer.notification.create({
+          userId,
+          title: "Course Activated! 📚",
+          message: `Your access to the course "${course.title}" has been successfully activated.`,
+          type: "ENROLLMENT" as any,
+          priority: "HIGH" as any,
+        });
+
+        const userEmail = (await prisma.user.findUnique({ where: { id: userId } }))!.email;
+        await ServiceContainer.email.send(
+          userEmail,
+          `Enrollment Confirmation: ${course.title}`,
+          `<p>Welcome! Your access to the course <b>${course.title}</b> has been successfully activated. Start learning today!</p>`
+        );
+      } catch (err) {
+        ServiceContainer.logger.error(`Notification/Email dispatch failed for free course enrollment: ${err}`);
+      }
+
+      return txResult as { payment: Payment; isFree: true };
+    }
+
+    try {
+      await ServiceContainer.audit.log({
+        userId,
+        action: "PAYMENT_CREATED",
+        resource: "Payment",
+        resourceId: txResult.payment.id,
+        details: { amount: finalAmount, providerPaymentId: txResult.payment.transactionId },
+        status: "SUCCESS",
+      });
+    } catch {}
+
+    return txResult as { payment: Payment; approvalUrl?: string; isFree: false };
   }
 
   async getPaymentById(id: string): Promise<Payment> {

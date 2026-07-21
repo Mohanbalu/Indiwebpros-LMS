@@ -38,6 +38,8 @@ export class EnrollmentService {
     const provider = paymentService.getProvider(payment.provider);
     const verifyResult = await provider.verifyPayment(payment.transactionId || "", payload);
 
+    // Only database reads/writes inside the transaction — no audit, notifications, or emails.
+    let enrollmentId: string | undefined;
     const updatedPayment = await prisma.$transaction(async (tx) => {
       // 1. Update Payment status
       const updatedPayment = await tx.payment.update({
@@ -61,16 +63,6 @@ export class EnrollmentService {
         },
       });
 
-      // Log Payment Verified Audit
-      await ServiceContainer.audit.log({
-        userId,
-        action: "PAYMENT_VERIFIED",
-        resource: "Payment",
-        resourceId: paymentId,
-        details: { status: verifyResult.status, transactionId: verifyResult.transactionId },
-        status: verifyResult.success ? "SUCCESS" : "FAILED",
-      });
-
       if (verifyResult.success) {
         // 3. Create active Enrollment
         const enrollment = await tx.enrollment.create({
@@ -83,13 +75,31 @@ export class EnrollmentService {
             expiresAt: null,
           },
         });
+        enrollmentId = enrollment.id;
+      } else {
+        throw new PaymentFailedException("Verification returned failed status");
+      }
 
-        // 4. Log Enrollment Audits
+      return updatedPayment;
+    });
+
+    // Audit logs, notifications, and emails — all AFTER transaction commits
+    if (verifyResult.success && enrollmentId) {
+      try {
+        await ServiceContainer.audit.log({
+          userId,
+          action: "PAYMENT_VERIFIED",
+          resource: "Payment",
+          resourceId: paymentId,
+          details: { status: verifyResult.status, transactionId: verifyResult.transactionId },
+          status: "SUCCESS",
+        });
+
         await ServiceContainer.audit.log({
           userId: payment.userId,
           action: "ENROLLMENT_CREATED",
           resource: "Enrollment",
-          resourceId: enrollment.id,
+          resourceId: enrollmentId,
           details: { accessType: AccessType.LIFETIME },
           status: "SUCCESS",
         });
@@ -98,20 +108,11 @@ export class EnrollmentService {
           userId: payment.userId,
           action: "ENROLLMENT_ACTIVATED",
           resource: "Enrollment",
-          resourceId: enrollment.id,
+          resourceId: enrollmentId,
           details: {},
           status: "SUCCESS",
         });
-      } else {
-        throw new PaymentFailedException("Verification returned failed status");
-      }
 
-      return updatedPayment;
-    });
-
-    if (verifyResult.success) {
-      // Send notifications & emails outside transaction context to prevent timeouts
-      try {
         await ServiceContainer.notification.create({
           userId: payment.userId,
           title: "Purchase Successful! 💳",
@@ -154,7 +155,7 @@ export class EnrollmentService {
           `<p>Your lifetime access to ${payment.course.title} has been successfully activated.</p>`
         );
       } catch (err) {
-        ServiceContainer.logger.error(`Failed to dispatch notifications/emails: ${err}`);
+        ServiceContainer.logger.error(`Failed to dispatch audit/notifications/emails: ${err}`);
       }
     }
 
@@ -176,7 +177,9 @@ export class EnrollmentService {
     const provider = paymentService.getProvider(payment.provider);
     const refundRes = await provider.refundPayment(payment.transactionId || "", refundAmount);
 
-    return prisma.$transaction(async (tx) => {
+    // Only database reads/writes inside the transaction — no audit, notifications, or emails.
+    const enrollmentIds = payment.enrollments.map((e) => e.id);
+    const updatedPayment = await prisma.$transaction(async (tx) => {
       const updatedPayment = await tx.payment.update({
         where: { id: paymentId },
         data: {
@@ -193,12 +196,19 @@ export class EnrollmentService {
             expiresAt: new Date(),
           },
         });
+      }
 
+      return updatedPayment;
+    });
+
+    // Audit logs, notifications, and emails — all AFTER transaction commits
+    try {
+      for (const enrollmentId of enrollmentIds) {
         await ServiceContainer.audit.log({
           userId: adminUserId,
           action: "ENROLLMENT_CANCELLED",
           resource: "Enrollment",
-          resourceId: enrollment.id,
+          resourceId: enrollmentId,
           details: { reason: "Payment Refunded" },
           status: "SUCCESS",
         });
@@ -213,26 +223,24 @@ export class EnrollmentService {
         status: "SUCCESS",
       });
 
-      try {
-        await ServiceContainer.notification.create({
-          userId: payment.userId,
-          title: "Refund Completed 💰",
-          message: `A refund of ₹${refundAmount} has been processed for the course "${payment.course.title}".`,
-          type: "PAYMENT" as any,
-          priority: "HIGH" as any,
-        });
+      await ServiceContainer.notification.create({
+        userId: payment.userId,
+        title: "Refund Completed 💰",
+        message: `A refund of ₹${refundAmount} has been processed for the course "${payment.course.title}".`,
+        type: "PAYMENT" as any,
+        priority: "HIGH" as any,
+      });
 
-        await ServiceContainer.email.send(
-          payment.user.email,
-          `Refund Confirmation for ${payment.course.title}`,
-          `<p>A refund of ₹${refundAmount} has been processed successfully for <b>${payment.course.title}</b>. Your enrollment has been cancelled.</p>`
-        );
-      } catch (err) {
-        ServiceContainer.logger.error(`Failed to send refund notification/email: ${err}`);
-      }
+      await ServiceContainer.email.send(
+        payment.user.email,
+        `Refund Confirmation for ${payment.course.title}`,
+        `<p>A refund of ₹${refundAmount} has been processed successfully for <b>${payment.course.title}</b>. Your enrollment has been cancelled.</p>`
+      );
+    } catch (err) {
+      ServiceContainer.logger.error(`Failed to send refund audit/notifications/emails: ${err}`);
+    }
 
-      return updatedPayment;
-    });
+    return updatedPayment;
   }
 
   async grantEnrollmentManual(
