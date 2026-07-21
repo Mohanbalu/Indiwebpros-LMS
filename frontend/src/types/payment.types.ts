@@ -134,6 +134,7 @@ export interface CreateOrderResponse {
   payment: {
     id: string;
     courseId: string;
+    transactionId: string | null;
     amount: number;
     discount: number;
     tax: number;

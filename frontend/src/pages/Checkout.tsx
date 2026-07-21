@@ -131,8 +131,16 @@ export default function Checkout() {
       const Razorpay = (window as unknown as RazorpayWindow).Razorpay;
       if (!Razorpay) throw new Error("Razorpay SDK not available");
 
-      // Use the Razorpay order ID from metadata (provider order ID)
-      const rzpOrderId = (payment.metadata as any)?.razorpayOrderId || payment.id;
+      // Prefer transactionId (order_xxx), fall back to metadata. Never use payment.id (UUID).
+      const razorpayOrderId = payment.transactionId ?? (payment.metadata as any)?.razorpayOrderId;
+      if (!razorpayOrderId) {
+        throw new Error("Razorpay Order ID missing from backend response.");
+      }
+
+      console.log("Payment Object:", payment);
+      console.log("Transaction ID:", payment.transactionId);
+      console.log("Metadata:", payment.metadata);
+      console.log("Order ID sent to Razorpay:", razorpayOrderId);
 
       const rzp = new Razorpay({
         key: razorpayKeyId,
@@ -140,7 +148,7 @@ export default function Checkout() {
         currency: payment.currency || "INR",
         name: "IndiWebPros LMS",
         description: course?.title || "Course Access Payment",
-        order_id: rzpOrderId,
+        order_id: razorpayOrderId,
         prefill: {
           name: `${user?.firstName || ""} ${user?.lastName || ""}`.trim(),
           email: user?.email || "",
@@ -148,14 +156,18 @@ export default function Checkout() {
         theme: { color: "#3B82F6" },
         handler: async (response) => {
           try {
+            const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = response;
+            if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+              throw new Error("Invalid Razorpay payment response.");
+            }
             await verifyPayment({
               paymentId: payment.id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
+              razorpay_order_id,
+              razorpay_payment_id,
+              razorpay_signature,
             });
             navigate(
-              `${ROUTES.paymentSuccess}?courseName=${encodeURIComponent(course?.title || "")}&courseId=${course?.id}&paymentId=${payment.id}&transactionId=${response.razorpay_payment_id}`
+              `${ROUTES.paymentSuccess}?courseName=${encodeURIComponent(course?.title || "")}&courseId=${course?.id}&paymentId=${payment.id}&transactionId=${razorpay_payment_id}`
             );
           } catch (err) {
             navigate(
