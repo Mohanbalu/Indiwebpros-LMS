@@ -8,20 +8,12 @@ import {
   purchaseCourseSchema,
   mockPaymentCallbackSchema,
   razorpayVerifySchema,
-  razorpayWebhookSchema,
   refundPaymentSchema,
   validateCouponSchema,
   createCouponSchema,
 } from "../validators/enrollment.validator";
 import { PaymentProvider, PaymentStatus } from "@/generated/client";
-import { RazorpayProvider } from "@/services/payment/providers/razorpay.provider";
-import { paymentConfigSchema } from "@/services/shared/config.schema";
-import {
-  PaymentVerificationException,
-  WebhookVerificationException,
-  DuplicatePaymentException,
-} from "../errors/enrollment-exceptions";
-import { ServiceContainer } from "@/services/shared/service-container";
+import { DuplicatePaymentException } from "../errors/enrollment-exceptions";
 
 // ==========================================
 // PurchaseController
@@ -120,107 +112,6 @@ export class PurchaseController {
       );
 
       res.json({ success: true, data: payment });
-    } catch (e) { next(e); }
-  }
-
-  /**
-   * POST /payments/razorpay/webhook
-   * Razorpay signed webhook handler — validates signature from raw body
-   * Must be mounted BEFORE express.json() middleware (uses req.rawBody)
-   */
-  static async razorpayWebhook(req: Request, res: Response, next: NextFunction) {
-    try {
-      const rawBody: string = (req as any).rawBody;
-      const signature = req.headers["x-razorpay-signature"] as string | undefined;
-
-      if (!rawBody || !signature) {
-        throw new WebhookVerificationException("Missing webhook body or signature header");
-      }
-
-      const config = paymentConfigSchema.parse({});
-      const rzp = new RazorpayProvider(config);
-      const isValid = rzp.verifyWebhookSignature(rawBody, signature);
-
-      if (!isValid) {
-        throw new WebhookVerificationException("Webhook HMAC signature mismatch");
-      }
-
-      // Parse the JSON event
-      let event: any;
-      try {
-        event = JSON.parse(rawBody);
-      } catch {
-        throw new WebhookVerificationException("Webhook body is not valid JSON");
-      }
-
-      const parsed = razorpayWebhookSchema.safeParse(event);
-      if (!parsed.success) {
-        // Unknown event — acknowledge but don't process
-        ServiceContainer.logger.info(`[RazorpayWebhook] Unknown event type, ignoring: ${event?.event}`);
-        return res.status(200).json({ received: true });
-      }
-
-      const { event: eventType, payload: webhookPayload } = parsed.data;
-      const rzpPayment = webhookPayload?.payment?.entity;
-      const rzpOrderId = rzpPayment?.order_id;
-      const rzpPaymentId = rzpPayment?.id;
-
-      ServiceContainer.logger.info(`[RazorpayWebhook] Event received: ${eventType} | Order: ${rzpOrderId} | Payment: ${rzpPaymentId}`);
-
-      switch (eventType) {
-        case "payment.captured": {
-          // Find our payment record by the Razorpay order ID stored in transactionId
-          const payment = await prisma.payment.findFirst({
-            where: { transactionId: rzpOrderId, status: { not: PaymentStatus.SUCCESS } },
-          });
-
-          if (payment) {
-            await enrollmentService.verifyPurchase(
-              payment.id,
-              {
-                razorpay_order_id: rzpOrderId,
-                razorpay_payment_id: rzpPaymentId,
-                razorpay_signature: "WEBHOOK_VERIFIED", // Already verified above
-                _webhookVerified: true,
-              },
-              payment.userId
-            ).catch((err) => {
-              ServiceContainer.logger.error(`[RazorpayWebhook] verifyPurchase failed: ${err}`);
-            });
-          }
-          break;
-        }
-
-        case "payment.failed": {
-          const payment = await prisma.payment.findFirst({
-            where: { transactionId: rzpOrderId, status: { not: PaymentStatus.FAILED } },
-          });
-
-          if (payment) {
-            await prisma.payment.update({
-              where: { id: payment.id },
-              data: {
-                status: PaymentStatus.FAILED,
-                metadata: { razorpayPaymentId: rzpPaymentId, failedAt: new Date().toISOString() },
-              },
-            });
-            ServiceContainer.logger.info(`[RazorpayWebhook] Payment marked FAILED for order: ${rzpOrderId}`);
-          }
-          break;
-        }
-
-        case "refund.created":
-        case "refund.processed": {
-          ServiceContainer.logger.info(`[RazorpayWebhook] Refund event received: ${eventType}`);
-          break;
-        }
-
-        default:
-          ServiceContainer.logger.info(`[RazorpayWebhook] Unhandled event: ${eventType}`);
-      }
-
-      // Always acknowledge immediately to avoid Razorpay retries
-      res.status(200).json({ received: true });
     } catch (e) { next(e); }
   }
 

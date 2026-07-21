@@ -1088,3 +1088,20 @@ model MentorFeedback {
   @@index([mentorId])
   @@index([studentId])
 }
+
+model WebhookEvent {
+  id           String    @id @default(uuid()) @db.Uuid
+  eventId      String    @unique
+  provider     String
+  eventType    String
+  payload      Json
+  status       String    @default("PENDING") // PENDING, PROCESSED, FAILED, DUPLICATE
+  errorMessage String?
+  processedAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([eventId])
+  @@index([eventType])
+  @@index([status])
+  @@index([createdAt])
+}

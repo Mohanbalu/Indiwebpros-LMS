@@ -141,6 +141,7 @@ export class RazorpayProvider implements IPaymentService, ILifecycleService, IHe
   /**
    * Verify Razorpay payment signature using HMAC SHA256.
    * Never trust frontend success — always verify on backend.
+   * Uses constant-time comparison to prevent timing attacks.
    */
   async verifyPayment(payload: Record<string, unknown>): Promise<boolean> {
     this.transactionsCount++;
@@ -158,7 +159,7 @@ export class RazorpayProvider implements IPaymentService, ILifecycleService, IHe
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest("hex");
 
-    const isValid = expectedSignature === razorpay_signature;
+    const isValid = this.safeCompare(expectedSignature, razorpay_signature as string);
 
     if (!isValid) {
       safeLog("warn", `[Razorpay] Signature mismatch for order: ${razorpay_order_id} | payment: ${razorpay_payment_id}`);
@@ -172,6 +173,7 @@ export class RazorpayProvider implements IPaymentService, ILifecycleService, IHe
   /**
    * Verify Razorpay webhook event signature.
    * The raw request body string is hashed with the webhook secret.
+   * Uses constant-time comparison to prevent timing attacks.
    */
   verifyWebhookSignature(rawBody: string, signature: string): boolean {
     const expected = crypto
@@ -179,7 +181,7 @@ export class RazorpayProvider implements IPaymentService, ILifecycleService, IHe
       .update(rawBody)
       .digest("hex");
 
-    const isValid = expected === signature;
+    const isValid = this.safeCompare(expected, signature);
 
     if (!isValid) {
       safeLog("warn", "[Razorpay] Webhook signature verification FAILED");
@@ -188,6 +190,20 @@ export class RazorpayProvider implements IPaymentService, ILifecycleService, IHe
     }
 
     return isValid;
+  }
+
+  /**
+   * Constant-time string comparison to prevent timing attacks on HMAC signatures.
+   */
+  private safeCompare(a: string, b: string): boolean {
+    const bufA = Buffer.from(a, "utf8");
+    const bufB = Buffer.from(b, "utf8");
+    if (bufA.length !== bufB.length) {
+      // Still do the comparison to keep timing constant
+      crypto.timingSafeEqual(bufA, Buffer.alloc(bufA.length));
+      return false;
+    }
+    return crypto.timingSafeEqual(bufA, bufB);
   }
 
   /**

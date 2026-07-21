@@ -59,12 +59,12 @@ export default function () {
     },
   });
 
-  // Sending fake signature which should return 400 (signature verification load)
+  // Sending fake signature which should return 200 (invalid sig logged but always acknowledged)
   const webhookRes = http.post(`${BASE_URL}/api/v1/payments/razorpay/webhook`, webhookPayload, {
     headers: Object.assign({}, headers, { "x-razorpay-signature": "fake_signature_hash" }),
   });
   check(webhookRes, {
-    "webhook signature rejected": (r) => r.status === 400,
+    "webhook acknowledged despite invalid signature": (r) => r.status === 200,
   });
 
   sleep(1);

@@ -18,11 +18,26 @@ import { logger } from "@/utils/logger";
 
 import { ServiceContainer, ServiceFactory } from "@/services";
 import { loadSecrets } from "@/config/secrets";
+import { razorpayWebhookHandler } from "@/modules/enrollment/webhook/razorpay-webhook";
 
 const app = express();
 
 // Trust Proxy for load balancers in production
 app.set("trust proxy", 1);
+
+// ==========================================
+// Razorpay Webhook — MUST be before express.json()
+// Raw body capture for HMAC signature verification
+// ==========================================
+app.post(
+  "/api/v1/payments/razorpay/webhook",
+  express.raw({ type: "application/json" }),
+  (req: express.Request, _res: express.Response, next: express.NextFunction) => {
+    (req as any).rawBody = req.body.toString("utf8");
+    next();
+  },
+  razorpayWebhookHandler
+);
 
 // Security, parsing and compression
 app.use(helmet());

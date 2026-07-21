@@ -1,27 +1,16 @@
-import { Router, Request, Response, NextFunction } from "express";
+import { Router } from "express";
 import { PurchaseController } from "../controllers/purchase.controller";
 import { authGuard, authorize } from "@/middlewares/auth";
 import rateLimit from "express-rate-limit";
-import express from "express";
 
 const router = Router();
 const rl = rateLimit({ windowMs: 60_000, max: 30 });
 
 // ==========================================
-// Razorpay Webhook — MUST be before express.json()
-// Raw body capture middleware only for this route
+// NOTE: Razorpay webhook route is mounted in app.ts
+// BEFORE express.json() to preserve raw body for
+// HMAC signature verification. See app.ts.
 // ==========================================
-
-router.post(
-  "/razorpay/webhook",
-  express.raw({ type: "application/json" }),
-  (req: Request, _res: Response, next: NextFunction) => {
-    // Capture raw body string for HMAC signature verification
-    (req as any).rawBody = req.body.toString("utf8");
-    next();
-  },
-  PurchaseController.razorpayWebhook
-);
 
 // ==========================================
 // Razorpay Payment Flow

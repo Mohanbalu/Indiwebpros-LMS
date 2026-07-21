@@ -663,6 +663,18 @@ exports.Prisma.MentorFeedbackScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.WebhookEventScalarFieldEnum = {
+  id: 'id',
+  eventId: 'eventId',
+  provider: 'provider',
+  eventType: 'eventType',
+  payload: 'payload',
+  status: 'status',
+  errorMessage: 'errorMessage',
+  processedAt: 'processedAt',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -897,7 +909,8 @@ exports.Prisma.ModelName = {
   MentorAssignment: 'MentorAssignment',
   MentorSession: 'MentorSession',
   MentorNote: 'MentorNote',
-  MentorFeedback: 'MentorFeedback'
+  MentorFeedback: 'MentorFeedback',
+  WebhookEvent: 'WebhookEvent'
 };
 
 /**
