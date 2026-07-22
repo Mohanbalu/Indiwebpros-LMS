@@ -16,6 +16,7 @@ import assignmentRouter from "../modules/assessment/routes/assignment.routes";
 import bankRouter from "../modules/assessment/routes/bank.routes";
 import certificateRouter from "../modules/certificate/routes/certificate.routes";
 
+import profileRouter from "./profile.routes";
 import dashboardRouter from "../modules/dashboard/routes/dashboard.routes";
 import instructorDashboardRouter from "../modules/dashboard/routes/instructor-dashboard.routes";
 import mentorDashboardRouter from "../modules/dashboard/routes/mentor-dashboard.routes";
@@ -40,6 +41,7 @@ const placeholderRouter = (moduleName: string) => {
 };
 
 apiRouter.use("/auth", authRouter);
+apiRouter.use("/profile", profileRouter);
 apiRouter.use("/storage", storageRouter);
 apiRouter.use("/email", emailRouter);
 apiRouter.use("/notifications", notificationRouter);

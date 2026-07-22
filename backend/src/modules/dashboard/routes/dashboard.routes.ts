@@ -21,9 +21,15 @@ router.get("/quizzes", readRl, StudentDashboardController.getQuizzes);
 router.get("/assignments", readRl, StudentDashboardController.getAssignments);
 router.get("/security", readRl, StudentDashboardController.getSecurity);
 
+import multer from "multer";
+
+const upload = multer({ storage: multer.memoryStorage() });
+
 // Profile Tab Dashboard routes
 router.get("/profile", readRl, ProfileController.getProfileData);
 router.put("/profile", ProfileController.updateProfileSettings);
 router.post("/profile/wishlist", ProfileController.toggleWishlist);
+router.post("/profile/avatar", upload.single("avatar"), ProfileController.uploadAvatar);
+router.post("/profile/cover", upload.single("cover"), ProfileController.uploadCover);
 
 export default router;

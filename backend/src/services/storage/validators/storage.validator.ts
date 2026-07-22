@@ -4,6 +4,7 @@ import { StorageValidationException } from "../errors/storage-exceptions";
 
 export const UploadTypeFolders: Record<string, string> = {
   avatar: "avatars",
+  cover: "covers",
   thumbnail: "course-thumbnails",
   video: "lesson-videos",
   resource: "resources",

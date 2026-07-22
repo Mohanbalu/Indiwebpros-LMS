@@ -1,8 +1,10 @@
 import { Request, Response, NextFunction } from "express";
+import path from "path";
 import { prisma } from "@/database/client";
 import { EnrollmentStatus, PaymentStatus } from "@/generated/client";
 import { ServiceContainer } from "@/services/shared/service-container";
-import { NotFoundError } from "@/errors/custom-errors";
+import { NotFoundError, ValidationError } from "@/errors/custom-errors";
+import { StorageValidator } from "@/services/storage/validators/storage.validator";
 
 export class ProfileController {
   static async getProfileData(req: Request, res: Response, next: NextFunction) {
@@ -25,7 +27,24 @@ export class ProfileController {
       const linkedin = meta.linkedin || "";
       const portfolio = meta.portfolio || "";
       const website = meta.website || "";
-      const coverUrl = meta.coverUrl || "";
+      let coverUrl = meta.coverUrl || "";
+      if (meta.coverKey) {
+        try {
+          coverUrl = await ServiceContainer.storage.getSignedDownloadUrl(meta.coverKey, 3600);
+        } catch {
+          coverUrl = meta.coverUrl || "";
+        }
+      }
+
+      let avatarUrl = student.avatarFile?.url || "";
+      if (student.avatarFile?.key) {
+        try {
+          avatarUrl = await ServiceContainer.storage.getSignedDownloadUrl(student.avatarFile.key, 3600);
+        } catch {
+          avatarUrl = student.avatarFile?.url || "";
+        }
+      }
+
       const country = meta.country || "";
       const state = meta.state || "";
       const city = meta.city || "";
@@ -54,6 +73,7 @@ export class ProfileController {
         lessonProgresses,
         payments,
         auditLogs,
+        recentlyViewedLessons,
       ] = await Promise.all([
         // Enrolled Courses
         prisma.enrollment.findMany({
@@ -114,14 +134,32 @@ export class ProfileController {
           orderBy: { createdAt: "desc" },
           take: 15,
         }),
+        // Recently viewed lessons list for streak/heatmap alignment
+        prisma.recentlyViewedLesson.findMany({
+          where: { userId },
+          select: { lastViewedAt: true },
+          orderBy: { lastViewedAt: "desc" },
+        }),
       ]);
 
       // 3. Compute Streak dynamically (IST based)
       const uniqueDays = new Set<number>();
+
+      recentlyViewedLessons.forEach((v) => {
+        const dayIndex = Math.floor((v.lastViewedAt.getTime() + (5.5 * 60 * 60 * 1000)) / 86400000);
+        uniqueDays.add(dayIndex);
+      });
+
       lessonProgresses.forEach((p) => {
         const dayIndex = Math.floor((p.lastAccessedAt.getTime() + (5.5 * 60 * 60 * 1000)) / 86400000);
         uniqueDays.add(dayIndex);
       });
+
+      enrollments.forEach((e) => {
+        const dayIndex = Math.floor((e.enrolledAt.getTime() + (5.5 * 60 * 60 * 1000)) / 86400000);
+        uniqueDays.add(dayIndex);
+      });
+
       let streak = 0;
       const sortedDays = Array.from(uniqueDays).sort((a, b) => b - a);
       if (sortedDays.length > 0) {
@@ -136,6 +174,10 @@ export class ProfileController {
             }
           }
         }
+      }
+
+      if (student.learningStreak > streak) {
+        streak = student.learningStreak;
       }
 
       // Compute total watch time
@@ -163,9 +205,23 @@ export class ProfileController {
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
       
+      recentlyViewedLessons.forEach((v) => {
+        if (v.lastViewedAt >= sixMonthsAgo) {
+          const dateStr = new Date(v.lastViewedAt.getTime() + (5.5 * 60 * 60 * 1000)).toISOString().split("T")[0];
+          calendarData[dateStr] = (calendarData[dateStr] || 0) + 1;
+        }
+      });
+
       lessonProgresses.forEach((p) => {
         if (p.lastAccessedAt >= sixMonthsAgo) {
           const dateStr = new Date(p.lastAccessedAt.getTime() + (5.5 * 60 * 60 * 1000)).toISOString().split("T")[0];
+          calendarData[dateStr] = (calendarData[dateStr] || 0) + 1;
+        }
+      });
+
+      enrollments.forEach((e) => {
+        if (e.enrolledAt >= sixMonthsAgo) {
+          const dateStr = new Date(e.enrolledAt.getTime() + (5.5 * 60 * 60 * 1000)).toISOString().split("T")[0];
           calendarData[dateStr] = (calendarData[dateStr] || 0) + 1;
         }
       });
@@ -402,7 +458,7 @@ export class ProfileController {
           phone: student.phone || "",
           college: student.college || "",
           bio: student.bio || "",
-          avatarUrl: student.avatarFile?.url || "",
+          avatarUrl,
           roleName: student.role?.name || "Student",
           isEmailVerified: student.isEmailVerified,
           createdAt: student.createdAt,
@@ -582,6 +638,150 @@ export class ProfileController {
       });
 
       res.json({ success: true, wishlist });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async uploadAvatar(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.file) {
+        throw new ValidationError("No avatar file payload detected in request");
+      }
+
+      const userId = req.user!.userId;
+      const originalName = req.file.originalname;
+      const mimeType = req.file.mimetype;
+      const size = req.file.size;
+
+      StorageValidator.validateFile(originalName, mimeType, size, "avatar");
+      const secureKey = StorageValidator.generateSecureKey(originalName, "avatar");
+
+      const result = await ServiceContainer.storage.upload(req.file.buffer, secureKey, {
+        contentType: mimeType,
+      });
+
+      const fileRecord = await prisma.file.create({
+        data: {
+          name: path.basename(secureKey),
+          originalName,
+          mimeType,
+          extension: path.extname(originalName).toLowerCase(),
+          size,
+          bucket: (result.bucket as string) || "indiwebpros-lms-storage",
+          key: secureKey,
+          url: (result.url as string) || `https://${result.bucket || 'indiwebpros-lms-storage'}.s3.amazonaws.com/${secureKey}`,
+          uploadedBy: userId,
+        },
+      });
+
+      // Update User avatarFileId
+      await prisma.user.update({
+        where: { id: userId },
+        data: { avatarFileId: fileRecord.id },
+      });
+
+      await ServiceContainer.audit.log({
+        userId,
+        action: "AVATAR_UPLOADED",
+        resource: "User",
+        resourceId: userId,
+        details: { fileId: fileRecord.id, key: secureKey },
+        status: "SUCCESS",
+      }).catch(() => {});
+
+      let signedAvatarUrl = fileRecord.url;
+      if (fileRecord.key) {
+        try {
+          signedAvatarUrl = await ServiceContainer.storage.getSignedDownloadUrl(fileRecord.key, 3600);
+        } catch {}
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Avatar uploaded successfully",
+        data: {
+          avatarUrl: signedAvatarUrl,
+          fileId: fileRecord.id,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async uploadCover(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.file) {
+        throw new ValidationError("No cover file payload detected in request");
+      }
+
+      const userId = req.user!.userId;
+      const originalName = req.file.originalname;
+      const mimeType = req.file.mimetype;
+      const size = req.file.size;
+
+      StorageValidator.validateFile(originalName, mimeType, size, "cover");
+      const secureKey = StorageValidator.generateSecureKey(originalName, "cover");
+
+      const result = await ServiceContainer.storage.upload(req.file.buffer, secureKey, {
+        contentType: mimeType,
+      });
+
+      const fileRecord = await prisma.file.create({
+        data: {
+          name: path.basename(secureKey),
+          originalName,
+          mimeType,
+          extension: path.extname(originalName).toLowerCase(),
+          size,
+          bucket: (result.bucket as string) || "indiwebpros-lms-storage",
+          key: secureKey,
+          url: (result.url as string) || `https://${result.bucket || 'indiwebpros-lms-storage'}.s3.amazonaws.com/${secureKey}`,
+          uploadedBy: userId,
+        },
+      });
+
+      // Fetch user to merge socialLinks.coverUrl & coverKey
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) throw new NotFoundError("User not found");
+
+      const prevMeta = (user.socialLinks as any) || {};
+      const updatedMeta = {
+        ...prevMeta,
+        coverUrl: fileRecord.url,
+        coverKey: fileRecord.key,
+      };
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: { socialLinks: updatedMeta },
+      });
+
+      await ServiceContainer.audit.log({
+        userId,
+        action: "COVER_UPLOADED",
+        resource: "User",
+        resourceId: userId,
+        details: { fileId: fileRecord.id, key: secureKey },
+        status: "SUCCESS",
+      }).catch(() => {});
+
+      let signedCoverUrl = fileRecord.url;
+      if (fileRecord.key) {
+        try {
+          signedCoverUrl = await ServiceContainer.storage.getSignedDownloadUrl(fileRecord.key, 3600);
+        } catch {}
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Cover photo uploaded successfully",
+        data: {
+          coverUrl: signedCoverUrl,
+          fileId: fileRecord.id,
+        },
+      });
     } catch (err) {
       next(err);
     }
